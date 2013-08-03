@@ -911,3 +911,80 @@ faked!
 timestamp: 2013-08-02T19:27:39.877731
 ALTER TABLE mzclust ADD instrument_id INTEGER REFERENCES instrument (id) ON DELETE CASCADE;
 faked!
+timestamp: 2013-08-03T13:06:05.234838
+CREATE TABLE test_liquid_chromatography(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    sample_id INTEGER NOT NULL,
+    sample_extraction_date DATE,
+    harvest_stage CHAR(512),
+    amount_of_sample_taken CHAR(512),
+    sample_extraction_desc TEXT,
+    extraction_solvent TEXT,
+    extraction_protocol TEXT,
+    name_of_protocol CHAR(512),
+    extraction_volume DOUBLE,
+    resuspension_process TEXT,
+    extract_cleanup TEXT,
+    storage_description TEXT,
+    storage_location TEXT,
+    storage_date DATE,
+    storage_temparature DOUBLE,
+    preparation_protocol TEXT,
+    preparation_date DATE,
+    storage_condition TEXT,
+    date_of_storage DATE,
+    sample_extraction_times INTEGER,
+    instrument_manufacturer CHAR(512),
+    instrument_model_name_ornumber CHAR(512),
+    instrument_software_package CHAR(512),
+    instrument_version_number_or_date CHAR(512),
+    injector_model CHAR(512),
+    injector_software_version CHAR(512),
+    method_name TEXT,
+    injection_volume CHAR(512),
+    wash_cycles CHAR(512),
+    solvent CHAR(512),
+    sample_size_or_concentration CHAR(512),
+    column_manufacturer CHAR(512),
+    product_name_and_catalogue_number_of_column CHAR(512),
+    stationary_media_composition CHAR(512),
+    internal_diameter_of_column CHAR(512),
+    length_of_column TEXT,
+    column_temperature_program TEXT,
+    column_head_pressure DOUBLE,
+    flow_rate DOUBLE,
+    seperation_method_name CHAR(512),
+    injector_temperature CHAR(512),
+    split_splitless_mode CHAR(512),
+    split_ratio CHAR(512),
+    mobile_phase_composition TEXT,
+    mobile_phase_flow_rate DOUBLE,
+    solvent_gradient_profiles TEXT,
+    validation_sample CHAR(512),
+    internal_standards CHAR(512),
+    external_standards CHAR(512),
+    chromatographic_resolution CHAR(512),
+    cycle_per_column INTEGER,
+    cycle_per_injector INTEGER,
+    cycle_per_septum CHAR(512),
+    cycle_per_blank INTEGER,
+    detector CHAR(512),
+    SOP_protocol_name CHAR(512),
+    date_of_analysis DATE,
+    operator INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    deviation_from_SOP TEXT,
+    tergetted_or_untargtted_approach CHAR(512),
+    publication_refernce TEXT,
+    additional_information TEXT,
+    other_add_info_upload CHAR(512)
+);
+success!
+timestamp: 2013-08-03T13:08:23.285218
+ALTER TABLE test_liquid_chromatography ADD type CHAR(512);
+timestamp: 2013-08-03T13:16:07.214690
+ALTER TABLE liquid_chromatography ADD instrument_type CHAR(512);
+timestamp: 2013-08-03T13:30:50.836739
+ALTER TABLE liquid_chromatography ADD instrument_name CHAR(512);
+timestamp: 2013-08-03T13:47:50.177144
+ALTER TABLE gas_chromatography ADD instrument_name CHAR(512);
