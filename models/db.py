@@ -924,6 +924,7 @@ db.define_table('peakgroup',
 
 #job table
 db.define_table('job',
-    Field('id','reference auth_user'),
+    Field('user_id','reference auth_user'),
+    Field('project_id','reference project'),
     Field('instrument_id',db.instrument),
-    Field('id','reference scheduler_task'))
+    Field('task_id','reference scheduler_task'))
