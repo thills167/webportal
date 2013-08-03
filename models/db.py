@@ -470,6 +470,7 @@ db.define_table('gas_chromatography',
     Field('publication_refernce','text',length=1000,label='Publication reference(If any)'),
     Field('additional_information','text',label='Additional Information'),
     Field('other_add_info_upload','upload',label='or'),
+    Field('instrument_name','string',label='Instument Name',requires=IS_IN_SET(['GC/TOF','GC/Single Quad (CentWave)','GC/Single Quad (MatchedFilter)'],zero=None)),
 plural='GC')
 #Acqusation column end under gc  69   --->23.3.13  
 
@@ -558,6 +559,7 @@ db.define_table('liquid_chromatography',
     Field('tergetted_or_untargtted_approach',requires=IS_EMPTY_OR(IS_IN_SET({'0':'Targetted Approach','1':'Untargetted Approach'})),label='Approach'),
     Field('publication_refernce','text',length=1000,label='Publication reference'), Field('additional_information','text',label='Additional Information'),
     Field('other_add_info_upload','upload',label='or'),
+    Field('instrument_name','string',label='Instument Name',requires=IS_IN_SET(['HPLC/Q-TOF','HPLC/UHD Q-TOF','HPLC/ UHD Q-TOF (Negative mode)','HPLC/Brucker Q-TOF (Negative mode)','HPLC/IonTrap','HPLC/SingleQuad','HPLC/ Orbitrap I (Fourier Tranform - MS)','HPLC/Orbitrap II (Fourier Tranform - MS)','HPLC/Waters TOF','UPLC/UHD Q-TOF','UPLC/Orbitrap (Fourier transform - MS )','UPLC/Q-Executive','UPLC/Brucker Q-TOF','UPLC/TripleTOF'],zero=None)),
   # 64
 
 plural='LC')
