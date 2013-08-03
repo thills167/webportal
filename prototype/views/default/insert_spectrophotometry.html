@@ -1,0 +1,7 @@
+{{extend 'layout.html'}}
+<h4>Spectrophotometry</h4>
+{{request.args.append('clear')}}
+{{=H5(A('Clear',_href=URL('insert_spectrophotometry',args=request.args)))}}
+{{=form}}
+{{pass}}
+~         

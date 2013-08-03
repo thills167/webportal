@@ -1,0 +1,700 @@
+(dp1
+S'output'
+p2
+S"<type 'exceptions.AttributeError'> 'Query' object has no attribute 'type'"
+p3
+sS'layer'
+p4
+S'/home/lavya/web2py/applications/volt/controllers/default.py'
+p5
+sS'code'
+p6
+S'# -*- coding: utf-8 -*-\n# this file is released under public domain and you can use without limitations\n\n########################## Tips\n#http://stackoverflow.com/questions/12354353/duplicate-a-record-and-its-references-in-web2py\n\n\n#########################################################################\n## This is a samples controller\n## - index is the default action of any application\n## - user is required for authentication and authorization\n## - download is for downloading files uploaded in the db (does streaming)\n## - call exposes all registered services (none by default)\n#########################################################################\n\ndef index():\n    """\n    example action using the internationalization operator T and flash\n    rendered by views/default/index.html or views/generic.html\n    """\n    redirect(URL(\'default\',\'list_all_projects\'))\n    #redirect(URL(\'plugin_wiki\',\'page/home\'))\n\ndef user():\n    """\n    exposes:\n    http://..../[app]/default/user/login\n    http://..../[app]/default/user/logout\n    http://..../[app]/default/user/register\n    http://..../[app]/default/user/profile\n    http://..../[app]/default/user/retrieve_password\n    http://..../[app]/default/user/change_password\n    use @auth.requires_login()\n        @auth.requires_membership(\'group name\')\n        @auth.requires_permission(\'read\',\'table name\',record_id)\n    to decorate functions that need access control\n    """\n    return dict(form=auth())\n\ndef download():\n    """\n    allows downloading of uploaded files\n    http://..../[app]/default/download/[filename]\n    """\n    return response.download(request,db)\n\n\ndef call():\n    """\n    exposes services. for example:\n    http://..../[app]/default/call/jsonrpc\n    decorate with @services.jsonrpc the functions to expose\n    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv\n    """\n    return service()\n\n\ndef authenticate(uid,pid,func):   \n   result = db(db.role.user == uid)(db.role.approval_status==1)(db.role.project == pid).select(db.role.ALL)\n   myroles = [role_list[int(k.role)] for k in result]\n   is_coordinator = db(db.project.project_coordinator == uid).select(db.project.ALL)\n   if func == \'roles\':\n\tif len(is_coordinator):\n\t  error = \'\'\n\telse:\n\t   error = \'You must be a project co-ordinator to manage roles\'\n\treturn error  \n   if func == \'add_project\':\n\tif len(is_coordinator):\n\t  error = \'\'\n\telse:\n\t   error = \'\'\n        return error\n   if func == \'add_sample\':\n\tif \'experimentalist\' in myroles:\n\t  error = \'\'\n\telse:\n\t   error = \'SignUp for  "Experimentalist Role" in this project to add a sample. Use Browser back button to navigate to Project View.\'\n        return error\n   if func == \'experimentalist\':\n\tif \'experimentalist\' in myroles:\n\t  error = \'\'\n\telse:\n\t   error = \'You must be an experimentalist to add the biosource information of a sample\'\n        return error\n   if func == \'my_samples\':\n\tif  \'experimentalist\' in myroles:\n\t  error = \'\'\n\telse:\n\t   error = \'You are not authorized to view this page\'\n        return error\n\ndef basic_groups(pid):\n    """ creates the basic groups on general basis or id basis """\n    if not pid:\n        for i in role_list:\n\t   auth.add_group(i,i) \n    else:\n        pid_groups = [str(pid)+\'#\'+i for i in role_list]\n\tfor k in pid_groups:\n\t   auth.add_group(k,k)\n    return locals()\t   \n\n\n@auth.requires_login()\ndef add_project():\n    error = authenticate(auth.user.id,\'\',\'add_project\')\n    form = SQLFORM(db.project,fields=[\'name\',\'code\',\'start_date\',\'project_description\',\'project_literature_reference\',\'project_journal_name\',\'project_publication_date\'],showid=False)\n    form.add_button(\'Back\', URL(\'list_all_projects\'))\n    form.vars.project_coordinator = auth.user.id\n    if form.process().accepted:\n       response.flash =\'accepted\'\n       result = db(db.project.name == form.vars.name).select(db.project.ALL).first()\n       basic_groups(result.id)\n       db.role.insert(user=auth.user.id,project=result.id,role=6,approval_status=1,member_since=now)\n       redirect(URL(\'project_viewer\',args = form.vars.id))\n    elif form.errors:\n       response.flash = \'errors\'\n    return locals()\n\n@auth.requires_login()\ndef remove_project():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n    ]\n    """takes an id and removes the project """ \n    pid  = request.args(0)\n    pid_groups = [str(pid)+\'#\'+i for i in role_list]\n    for z in pid_groups:\n\tpgid = auth.id_group(z)\n\tauth.del_group(pgid)\n    del db.project[pid]\n    return locals()\n\ndef add_experiment():\n    grid = SQLFORM.grid(db.grouping)\n    return locals()\n\ndef new_affiliation():\n    form = SQLFORM(db.affiliation)\n    return locals()\n\ndef edit_project():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), []),\n    (T(\'Project\'), False, URL(\'default\',\'project_viewer\',args=request.args),[])\n    ]\n    crud.settings.update_next = URL(\'project_viewer\',args=request.args)\n    form=crud.update(db.project,request.args(0),deletable=False)\n    return locals();\n \n@auth.requires_login()\ndef project_viewer():\n    pid = request.args[-1]\n    project=db(db.project.id==pid).select(db.project.ALL).first()\n    cord = db(db.auth_user.id==db.project.project_coordinator).select(db.auth_user.ALL).first()\n    #project_summary=db(db.project.id==pid and db.role.project==pid and db.role.approval_status==1).select(db.role.role,db.role.role.count(),groupby=db.role.role);\n    project_summary=db((db.role.project==pid) & (db.role.approval_status==1) ).select(db.role.role,orderby=db.role.role)\n    local1=0\n    for i in project_summary:\n       if project_summary[local1].role==\'0\':\n          project_summary[local1].role="investigators"\n       if project_summary[local1].role==\'1\':\n          project_summary[local1].role="co-investigators"\n       if project_summary[local1].role==\'2\':\n          project_summary[local1].role="collaborators"\n       if project_summary[local1].role==\'3\':\n          project_summary[local1].role="analysts"\n       if project_summary[local1].role==\'4\':\n          project_summary[local1].role="experimentalists"\n       if project_summary[local1].role==\'5\':\n          project_summary[local1].role="members"\n       if project_summary[local1].role==\'6\':\n          project_summary[local1].role="co-ordinators"\n       local1=local1+1 \n    \n    if authenticate(auth.user.id,\'\',\'roles\') == \'\':\n      response.menu = [\n      (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), []),\n      (T(\'Project\'), False, URL(\'default\',\'project_viewer\',args=request.args[-1]),[\n      (T(\'Grant Role\'),False,URL(\'roles\',args=project.id)),\n      (T(\'Edit Project\'),False,URL(\'edit_project\',args=project.id)),\n      (T(\'Sign Up\'),False,URL(\'reg_project\',args=project.id))],\n      )\n      ]\n    else :\n      response.menu = [\n      (T(\'Home\'), False, URL(\'default\',\'list_all_dev_projects\',args=auth.user.id), []),\n      (T(\'My Tasks\'), False, URL(\'default\',\'mytasks\'), []),\n      (T(\'Project\'), False, URL(\'default\',\'project_viewer\',args=request.args[-1]),[\n      (T(\'SignUP\'),False,URL(\'reg_project\',args=project.id))]\n      ),\n      ]\n      \n    if project.project_status == \'1\':\n      response.menu+= [\n      (T(\'Published Samples\'), False,URL(\'list_all_pub_samples\',args=(pid)),[])\n      ]\n    elif authenticate(auth.user.id,pid,\'add_sample\')==\'\':\n        response.menu+= [\n        (T(\'Samples\'), False,URL(\'my_samples\',args=(pid)),[\n        (T(\'My Samples\'), False,URL(\'my_samples\',args=(pid))),\n        ])\n        ]\n    if len(request.args) == 2:\n        response.flash = \'Project Succesfully \' + request.args[-2]\n       \n    users=db(db.role.approval_status==1)(db.role.project==pid)(db.role.project == db.project.id)(db.role.user==db.auth_user.id).select(db.role.ALL,db.auth_user.ALL)\n    samples=db((db.role.approval_status==1)&(db.sample.experimentalist==db.role.user)&(db.role.project==pid)&(db.sample.grouping==db.grouping.id)&(db.grouping.project==pid)).select(db.role.user,db.sample.working_status,groupby=db.sample.id)\n    is_coordinator = \'\'\n    myroles = \'\'\n    if auth.user:\n      is_coordinator = db(db.project.id == pid)(db.project.project_coordinator == auth.user.id).select(db.project.ALL).first()\n      result = db(db.role.user == auth.user.id)(db.role.project == pid).select(db.role.ALL)\n      myroles = [role_list[int(k.role)] for k in result]\n      \n    return locals()\n\n\ndef add_sample():\n  """ creates a exp on an project basis and should continue to fill the bio source data """\n  """ available to the experimentalist """ \n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  if \'new\' in request.args:\n   pid = request.args[-3]\n  else:\n   pid = request.args(0)\n  error = authenticate(auth.user.id,pid,\'add_sample\') \n  form = SQLFORM(db.sample,fields=[\'name\',\'code\',\'description\',\'scientific_name\'],showid=False)\n#added a field project in sample table\n#added two more fields in form insert root/replica etc and scientific name\n  if form.validate():\n      i = db.sample.insert(experimentalist=auth.user.id,name=form.vars.name,code=form.vars.code ,description=form.vars.description,grouping=pid,scientific_name=form.vars.scientific_name,working_status=1,publication_status=0)\n      response.flash = \'sample has been created\'\n      redirect(URL(\'list_all_dev_projects\',args=[\'project\',\'sample.project\',pid])) \n      # redirect to the sample creation \n  elif form.errors:\n      response.flash = \'Form has errors\'\n  return locals()\n\ndef sample_viewer():\n   response.menu = [\n   (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n   ]\n   i = request.args[-1]\n   if \'view\' in request.args: \n\tform = SQLFORM(db.sample, i,readonly =True,showid=False)\n   if \'edit\' in request.args: \n\tform = SQLFORM(db.sample, i,showid=False)\n   if form.process().accepted:\n\tresponse.flash = \'form accepted\'\n\tredirect(URL(\'list_all_dev_projects\',args = request.args[0:-3])) \n   elif form.errors:\n\tresponse.flash = \'form has errors\'\n   return dict(form=form)\n\n@auth.requires_login()\ndef list_all_projects():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'index\'), [])\n    #(T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), []),\n    #(T(\'Project\'), False, URL(\'default\',\'list_all_projects\'), [(T(\'Add Project\'),False,URL(\'default\',\'add_project\'))])\n    ]\n    form=FORM(\n              INPUT(_name=\'name\', requires=IS_NOT_EMPTY()),\n              INPUT(_type=\'submit\'))\n    form.elements(\'input[type=submit]\')[0]["_value"] = "Search"\n    if form.accepts(request,session):\n      redirect(URL(\'grid?keywords=tomato\')) \n    \n    #form=FORM(\'\',INPUT(_name=\'name\') ,INPUT(_type=\'submit\'))\n    #if form.process().accepted:\n      #redirect(URL(\'grid\')) \n    pub_projects = db(db.project.project_status == 1)(db.project.project_coordinator==db.auth_user.id).select(db.project.ALL,db.auth_user.ALL)\n    dev_projects = db(db.project.project_status == 0)(db.project.project_coordinator==db.auth_user.id).select(db.project.ALL,db.auth_user.ALL)\n    authenticated = \'no\'\n    if auth.user:\n\tif auth.user.position==\'4\':\n\t    authenticated = \'yes\'\n    return locals()\n\ndef grid():\n  # query=((db.project.project_status==0)&(db.experiment.project==db.project.id)&(db.sample.experiment==db.experiment.id)&(db.biosource.sample_name==db.sample.id))\n   query=((db.project.project_status==0)&(db.grouping.project==db.project.id)&(db.sample.grouping==db.grouping.id)&(db.sample.id==db.biosource.sample_name))\n   #query=((db.project.project_status==0))\n#   query=((db.sample.experiment==db.experiment.id)&((db.sample.id==db.biosource.sample_name)|(db.sample.id==db.plant_growth_condition.sample_name)))\n   grid = SQLFORM.grid(query)\n   return locals() \n\ndef temp():\n   q1 = (db.project.project_status ==  0)\n   q2 = (db.sample.publication_status == True)\n   ck = {}\n   fi = [db.project.name,db.project.project_coordinator,db.project.start_date,db.project.project_status,db.grouping.code,db.sample.name,db.sample.code,db.biosource.sample_name,db.plant_growth_condition.sample_name,db.treatments.sample_name,db.harvests.sample_name,db.extraction_preparation.sample_name,db.gas_chromatography.sample_name,db.liquid_chromatography.sample_name,db.mass_spectroscopy.sample_name,db.raw_data_storage_information.sample_name]\n   l1=[lambda row: A(\'View Post\',_href=URL("default","view",args=[row.id]))]\n   links={\'project\':l1}\n   grid = SQLFORM.smartgrid(db.project,ck,fields=fi,links=links,linked_tables=[\'grouping\',\'sample\',\'biosource\',\'plant_growth_condition\',\'treatments\',\'harvests\',\'extraction_preparation\',\'gas_chromatography\',\'liquid_chromatography\',\'mass_spectroscopy\',\'raw_data_storage_information\']) \n   return locals() \n\ndef list_all_pub_projects():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n    ]\n    q1 = (db.project.project_status ==  1)\n    q2 = (db.sample.publication_status == True)\n    ck = {\'project\':q1,\'sample\':q2}\n    fi = [db.project.name,db.project.project_coordinator,db.project.start_date,db.project.project_status,db.grouping.name,db.grouping.code,db.grouping.description,db.sample.name,db.sample.code,db.sample.publication_status,db.biosource.sample_name,db.plant_growth_condition.sample_name,db.treatments.sample_name,db.harvests.sample_name,db.extraction_preparation.sample_name,db.gas_chromatography.sample_name,db.liquid_chromatography.sample_name,db.mass_spectroscopy.sample_name,db.spectrophotometry.sample_name,db.raw_data_storage_information.sample_name]\n    args= request.args[0:5]\n    l1=[dict(header=\'BIO\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"biosource",)))), \\\n\t       dict(header=\'PGC\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"plant_growth_condition")))), \\\n\t       dict(header=\'TRT\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"treatments")))), \\\n\t       dict(header=\'HAR\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"harvests")))), \\\n\t      # dict(header=\'Ext\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"extraction_preparation")))), \\\n\t       dict(header=\'GC\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"gas_chromatography")))), \\\n\t       dict(header=\'LC\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"liquid_chromatography")))), \\\n\t       dict(header=\'MS\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"mass_spectroscopy")))), \\\n\t       dict(header=\'SPM\',body=lambda row: A(\'view\',_href=URL("default","router",args=p_getargs(row.id,args,"spectrophotometry")))),\n               lambda row: A(\'Files\'+tes(row.id,\'sample_files\'),_href=URL(\'default\',\'multiple_files\',args=row.id))]\n    s={\'sample\': lambda ids : redirect(URL(\'default\', \'multiple\', vars=dict(id=ids)))}\n    if \'view\' in request.args or \'edit\' in request.args or \'new\' in request.args:\n        l1=[]\n\trouter()\n    links={\'sample\':l1}    \n    grid = SQLFORM.smartgrid(db.project,ck,fields=fi,editable=False,deletable=False,create = False,linked_tables=[\'grouping\',\'sample\',\'raw_data_storage_information\'],links=links,selectable=s,exportclasses=dict(xml=False,csv_with_hidden_cols=False,html=False,csv=False,json=False)) \n    \n    return locals()\n\n@auth.requires_login()\ndef list_all_dev_projects():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n    ]\n    db.sample.experimentalist.default=auth.user.id\n    db.grouping.experimentalist.default=auth.user.id\n    db.sample.grouping.writable = False\n    db.sample.replica.writable = False\n    db.sample.parent.readable = False\n    db.sample.grouping.readable = False\n    db.grouping.experimentalist.writable = False\n    q1 = (db.project.project_status ==  0)\n    q2 = (db.sample.experimentalist == auth.user.id)\n    ck = {\'project\':q1,\'sample\':q2}\n    fi = [db.project.name,db.project.project_coordinator,db.project.start_date,db.project.project_status,db.grouping.name,db.grouping.code,db.grouping.description,db.sample.name,db.sample.code,db.sample.publication_status,db.biosource.sample_name,db.plant_growth_condition.sample_name,db.treatments.sample_name,db.harvests.sample_name,db.extraction_preparation.sample_name,db.gas_chromatography.sample_name,db.liquid_chromatography.sample_name,db.mass_spectroscopy.sample_name,db.spectrophotometry.sample_name,db.raw_data_storage_information.sample_name,db.raw_data_storage_information.raw_data_file_upload,db.raw_data_storage_information.raw_data_standard_format_upload,db.raw_data_storage_information.additional_information_upload]\n    edit_dict = {\'project\':False}\n    delete_dict = {\'project\':False}\n#Allow only one original sample to be added in an experiment others are replicates\n    addsample = True\n    create_dict = {\'project\':False,\'sample\':addsample}\n    orderby_dict ={\'sample\':db.sample.name} \n#Links for replicating samples  \n    args= request.args[0:5]\n    #args1=[\'project\',request.args[1],request.args[2],request.args[3],request.args[4],"biosource.sample_name","edit","biosource"]\n    l1=[lambda row: A(\'R+\',_href=URL("default","duplicate",args=request.args[:]+["replicate"]+[row.id])), \\\n\t      # lambda row: A(\'copy\',_href=URL("default","replicate",args=request.args[:]+[row.id])),\\\n\t       lambda row: A(\'A+\',_href=URL("default","duplicate",args=request.args[:]+["aliqout"]+[row.id])), \\\n\t       dict(header=\'BIO\',body=lambda row: A(\'\'+tes(row.id,\'biosource\'),_href=URL("default","router",args=getargs(row.id,args,"biosource")))), \\\n\t       dict(header=\'PGC\',body=lambda row: A(\'\'+tes(row.id,\'plant_growth_condition\'),_href=URL("default","router",args=getargs(row.id,args,"plant_growth_condition")))), \\\n\t       dict(header=\'TRT\',body=lambda row: A(\'\'+tes(row.id,\'treatments\'),_href=URL("default","router",args=getargs(row.id,args,"treatments")))), \\\n\t       dict(header=\'HAR\',body=lambda row: A(\'\'+tes(row.id,\'harvests\'),_href=URL("default","router",args=getargs(row.id,args,"harvests")))), \\\n\t      # dict(header=\'Ext\',body=lambda row: A(\'\'+tes(row.id,\'extraction_preparation\'),_href=URL("default","router",args=getargs(row.id,args,"extraction_preparation")))), \\\n\t       dict(header=\'GC\',body=lambda row: A(\'\'+tes(row.id,\'gas_chromatography\'),_href=URL("default","router",args=getargs(row.id,args,"gas_chromatography")))), \\\n\t       dict(header=\'LC\',body=lambda row: A(\'\'+tes(row.id,\'liquid_chromatography\'),_href=URL("default","router",args=getargs(row.id,args,"liquid_chromatography")))), \\\n\t       dict(header=\'MS\',body=lambda row: A(\'\'+tes(row.id,\'mass_spectroscopy\'),_href=URL("default","router",args=getargs(row.id,args,"mass_spectroscopy")))), \\\n\t       dict(header=\'SPM\',body=lambda row: A(\'\'+tes(row.id,\'spectrophotometry\'),_href=URL("default","router",args=getargs(row.id,args,"spectrophotometry")))),\n               lambda row: A(\'Pub\',_href=URL(\'default\',\'publish\',args=request.args[:]+[row.id])),\n               lambda row: A(\'Files\'+tes(row.id,\'sample_files\'),_href=URL(\'default\',\'multiple_files\',args=row.id))]\n               \n    \n#customized Views for certain forms using router   \n    if \'view\' in request.args or \'edit\' in request.args or \'new\' in request.args:\n        l1=[]\n     \trouter()\n    s={\'sample\': lambda ids : redirect(URL(\'default\', \'multiple\', vars=dict(id=ids)))}\n    links={\'sample\':l1}    \n    \n    grid = SQLFORM.smartgrid(db.project,ck,fields=fi,editable=edit_dict,orderby=orderby_dict,create=create_dict,deletable=delete_dict,links=links,linked_tables={\'project\':[\'grouping\'],\'grouping\':[\'sample\'],\'sample\':[\'raw_data_storage_information\'],\'raw_data_storage_information\':[]},links_placement=\'right\',showbuttontext=True,selectable = s,exportclasses=dict(xml=False,csv_with_hidden_cols=False,html=False,csv=False,json=False)) \n    return locals()\n\ndef publish():\n     row = db(db.sample.id == request.args[-1]).update(publication_status = "1")\n     session.flash = \'Sample published\'\n     redirect(URL(\'list_all_dev_projects\',args=request.args[0:-1]))\n     return () \n\ndef multiple():\n    tabs =[\'biosource\',\'plant_growth_condition\',\'treatments\',\'harvests\',\'gas_chromatography\',\'liquid_chromatography\',\'mass_spectroscopy\',\'spectrophotometry\',\'sample\']\n    tabs1 =[\'biosource\',\'plant_growth_condition\',\'treatments\',\'harvests\',\'gas_chromatography\',\'liquid_chromatography\',\'mass_spectroscopy\',\'spectrophotometry\']\n    s=request.vars[\'id\']\n    error=\'\'\n    if s==None or not  isinstance(s,list):\n     return dict(error=\'error\',leng=0)\n    elif len(s)<2:\n     return dict(error=\'error\',leng=len(s))\n\n    for tab1 in tabs1:\n     for fieldname in db[tab1].fields:\n      if db[tab1][fieldname].type != \'boolean\' and db[tab1][fieldname].type != \'upload\' and fieldname!=\'sample_name\' :  \n       db[tab1][fieldname].represent = lambda x,row,fi:compare(s[0],fi,x)\n       \n    tab_queries={}\n    brows = db(db.biosource.id<0).select()\n    for tab in tabs:\n       queries = []\n       for i in s:\n        if tab==\'sample\':\n         queries.append(db[tab].id==i)\n        else:\n         queries.append(db[tab].sample_name==i)\n       query = reduce(lambda a,b:(a|b),queries)\n       tab_queries[tab] = query\n    return dict(query=tab_queries,error=error,leng=s)\n\ndef compare(sampleid,fi,x):\n    row1 =db(db[fi._tablename].sample_name==sampleid).select(db[fi._tablename].ALL).first()\n    if x != None and row1 !=None:\n      if row1[fi]!=x:\n         return DIV(((B(I(x)))), _class="myclass")\n      elif row1[fi]==x:\n         return DIV(((x)), _class="mclass")\n    return \'none\'\n\n#gets table name and rowid as input and creates another row with same details as rowid recod has\n\ndef tes(a,table):\n    if table == \'sample_files\':\n     files =  db(db.sample_files.sample == a).count()\n     return \'(\'+str(files)+\')\'\n    elif db(db[table].sample_name==a).count()==0:\n     return "Add"\n    else:\n        return "Edit"\n    return "Add"\ndef getargs(a,args,table):\n    row = db(db[table].sample_name==a).select(db[table].id).first()\n    if row:\n        args=args+[table+".sample_name",a,"edit",table,row.id]\n        return args\n    else:\n        args = args+[table+".sample_name",a,"new",table]\n        return args\ndef p_getargs(a,args,table):\n    row = db(db[table].sample_name==a).select(db[table].id).first()\n    if row:\n        args=args+[table+".sample_name",a,"view",table,row.id]\n        return args\n    else:\n        args = args+[table+".sample_name",a,"new",table]\n        return args\n\ndef copy(sid):\n    if db(db.template.user==auth.user.id).count() == 0:\n       db.template.insert(user=auth.user.id, sample=sid)\n    else:   \n       db(db.template.user == auth.user.id).update(sample=sid)\n    #redirect(URL(\'list_all_dev_projects\',args=request.args[0:-1]))\n    #Unique fields take care\n    #product.update(sampleid=\'temp\')\n    return() \ndef duplicate():\n    if True:\n        rec = db(db.sample.id==request.args[-1]).select(db.sample.ALL).first()\n        rec.update(parent=rec.id,replica=str(request.args[-2]))\n        for f in db.sample.fields:\n\t    if f != \'id\':\n\t\tdb.sample[f].default = rec[f]\n\tdb.sample.replica.default = request.args[-2]\n\tdb.sample.replica.writable = False\n\tdb.sample.parent.readable = False\n\trep_count =0; ali_count=0;\n\trep_last= db(db.sample.parent==rec.id)(db.sample.replica==\'replicate\').count()\n\t#if rep_last:\n\t #   rep_count = int(rep_last.code.split(\'-\')[1])\n\tali_last= db(db.sample.parent==rec.id)(db.sample.replica==\'aliqout\').count()\n\t#if ali_last:\n\t #   ali_count = int(ali_last.code.split(\'-\')[1])\t    \n\tif request.args[-2] == \'replicate\':\n\t    db.sample.code.default = rec.code + \'_R-\'+ str(rep_last+1)\n\t    db.sample.name.default = rec.name + \'_R-\'+ str(rep_last+1)\n\tif request.args[-2] == \'aliqout\':\n\t    db.sample.code.default = rec.code + \'_A-\'+ str(ali_last+1)\n\t    db.sample.name.default = rec.name + \'_A-\'+ str(ali_last+1)\n\tdb.sample.name.writable= False\n\tdb.sample.code.writable= False\t\n        #in_row = db.sample.insert(**db.sample._filter_fields(rec))\n\tform = SQLFORM(db.sample)\n\tif form.process().accepted:\n         for tb in [\'biosource\',\'plant_growth_condition\',\'treatments\',\'harvests\',\'extraction_preparation\',\'gas_chromatography\',\'liquid_chromatography\',\'mass_spectroscopy\',\'spectrophotometry\']:\n            row = db(db[tb].sample_name==rec.id).select(db[tb].ALL).first()\n            if row:\n                row.update(sample_name = form.vars.id)\n                sam=db[tb].insert(**db[tb]._filter_fields(row)) \n         redirect(URL(\'list_all_dev_projects\',args=request.args[0:-2]))\n\treturn locals() \n    redirect(URL(\'list_all_dev_projects\',args=[]))\n\n\ndef my_samples():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n    ]\n    """ all my samples in the project with permissions to edit delete publish/unpublish samples """\n    error = authenticate(auth.user.id,request.args(0),\'add_sample\') \n    l =  [\'project\',\'grouping.project\',request.args(0)]\n    if error == \'\':\n      redirect(URL(\'list_all_dev_projects\',args=l))\n    return locals()\n\ndef list_all_samples1():\n    proj_id = request.args(0)\n    pub_samples = db((db.sample.working_status == 1)&(db.sample.project == proj_id)).select(db.sample.ALL)\n    dev_samples = db((db.sample.working_status == 0)&(db.sample.project == proj_id)).select(db.sample.ALL)\n    return locals()\n\ndef view_published_samples():\n    proj_id = request.args(0)\n    return locals() \n\ndef router():\n    l=request.args\n    if \'biosource\' in l:\n      redirect(URL(\'insert_biosource\',args = l))\n    elif \'plant_growth_condition\' in l:\n      redirect(URL(\'insert_pgc\',args = l))\n    elif \'treatments\' in l:\n      redirect(URL(\'insert_treatments\',args = l))\n    elif \'harvests\' in l:\n      redirect(URL(\'insert_harvests\',args = l))\n    elif \'extraction_preparation\' in l:\n      redirect(URL(\'insert_ep\',args = l))\n    elif \'gas_chromatography\' in l:\n        redirect(URL(\'insert_gc\',args = l))\n    elif \'liquid_chromatography\' in l:\n        redirect(URL(\'insert_lc\',args = l))\n    elif \'mass_spectroscopy\' in l:\n        redirect(URL(\'insert_ms\',args = l))\n    elif \'raw_data_storage_information\' in l:\n          redirect(URL(\'insert_raw_data\',args = l))\n    elif \'spectrophotometry\' in l:\n          redirect(URL(\'insert_spectrophotometry\',args = l))\n    elif \'sample\' in l and \'new\' in l:\n          samp = db(db.sample.experimentalist==auth.user.id).select().last()\n          if samp:\n           copy(samp.id)\n           return()\n          else: \n           return() \n    elif \'sample\' in l and \'view\' in l:\t\t\n        redirect(URL(\'sample\',args=l))\n    elif \'project\' in l and \'view\' in l and \'grouping\' not in l and \'sample_files\' not in l:\n        redirect(URL(\'project_viewer\',args=l[-1]))\n        \n    else:\n        return()\n\n\'\'\'\telif \'sample\' in l and \'new\' in l:\t\t\n\t  redirect(URL(\'add_sample\',args = l))\n\telif \'sample\' in l:\t\t\n\t  redirect(URL(\'sample_viewer\',args = l))\n\telif \'project\' in l:\n\t  redirect(URL(\'project_viewer\',args=l))\n\telse : \n\t  redirect(URL(\'index\'))\'\'\'\n\ndef list_all_pub_samples():\n#    proj_id = request.args(0)\n#    pub = request.args(1) # if pub == 1 show published samples otherwise non published samples\n#   pub_query = (db.sample.working_status == 1 and db.sample.project == proj_id)\n#   unpub_query = (db.sample.working_status == 0 and db.sample.project == proj_id)\n#   pquery_dict = {\'sample\':pub_query}\n#   nquery_dict = {\'sample\':unpub_query}\n#    if \'view\' in request.args or \'edit\' in request.args or \'new\' in request.args:\n#       router(request.args)\n#    if \'view\' in request.args or \'edit\' in request.args or \'new\' in request.args:\n#     \trouter(request.args)\n    \n    """an argument to display published and non-published samples"""\n    """ request.args(0) - project  , request.args(1) published"""\n\n    redirect(URL(\'list_all_pub_projects\',args=[\'project\',\'grouping.project\',request.args(0)]))\n    \ndef list_all_dev_samples():\n   \n    redirect(URL(\'list_all_dev_projects\',args=[\'project\',\'sample.project\',request.args(0)]))\n    return locals()\n\ndef ajx_role():\n    """ an ajax call back which takes care of insert , update and delete in the roles table """\n    rid = request.args(1)\n    if request.args(0) == \'accept\':\n       row = db(db.role.id == rid).update(approval_status = 1)\n       result = db(db.role.id == rid).select(db.role.ALL).first()\n       gid = auth.id_group(role_list[int(result.role)])\n       auth.add_membership(gid,result.user)\n       row_email = db(db.auth_user.id==result.user).select(db.auth_user.ALL).first()\n       mail.send(to=[row_email.email],\n\t                subject=\'Role Approved\',\n\t\t\t          # If reply_to is omitted, then mail.settings.sender is used\n\t\t\t\t            #reply_to=\'us@example.com\',\n\t\t\t\t\t              message=str(result))\n    if request.args(0) == \'unblock\':\n       del db.role[rid] \n    if request.args(0) == \'block\':\n       row = db(db.role.id == rid).update(approval_status = 2)\n    if request.args(0) == \'delete\' or request.args(0) == \'deny\':\n       result = db(db.role.id == rid).select(db.role.ALL).first()\n       gid = auth.id_group(role_list[int(result.role)])\n       auth.del_membership(gid,result.user)\n       del db.role[rid] \n    return locals()\n\ndef reg_project():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), []),\n    (T(\'Project\'), False, URL(\'default\',\'project_viewer\',args=request.args),[])\n    ]\n    """ takes an id for the project and registers """\n    import datetime\n    now = datetime.datetime.now()\n    """ already requested """\n    pid = request.args(0)\n    co_mail_row = db(db.project.id==pid)(db.project.project_coordinator==db.auth_user.id).select().first()\n    co_mail = co_mail_row.auth_user.email\n    ptitle = db(db.project.id == pid).select(db.project.ALL).first()\n    form = SQLFORM(db.role,fields=[\'role\'],showid=False)\n    if form.validate():\n       requested = db(db.role.user == auth.user.id)(db.role.project == pid)(db.role.approval_status == 0)(db.role.role==form.vars.role).count()\n       if requested == 0:\n        mail.send(to=[co_mail],\n\t          subject=\'New Project Role Approval\',\n\t\t\t\t                message=\'Hi, \'+auth.user.first_name+\' has applied for a role in the project \' + ptitle.name)\n        db.role.insert(user=auth.user.id,approval_status=0,project=pid,member_since=now,role=form.vars.role)\n        response.flash = \'wait for Coordinator\\\'s approval\'\n       else:\n        response.flash = \'You already hold the applied role\' \n    return locals() \n\ndef ajx_publish():\n    """ an ajax call back which takes care of publication status """\n    eid = request.args(1)\n    if request.args(0) == \'publish\':\n     row = db(db.project.id == eid).update(project_status = "1",project_publication_date = now)\n     redirect(URL(\'project_viewer\',args = [\'Published\',eid]))\n    elif request.args(0) == \'unpublish\':\n     row = db(db.project.id == eid).update(project_status = "0",project_publication_date= None)\n     redirect(URL(\'project_viewer\',args = [\'Unpublished\',eid]))\n    return locals() \n\ndef roles():\n    response.menu = [\n    (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), []),\n    (T(\'Project\'), False, URL(\'default\',\'project_viewer\',args=request.args),[])\n    ]\n    """ complete interface for managing roles for a particular project"""\n    """ should be accessible to only project co-ordinators """\n    pid = request.args(0)\n    error = authenticate(auth.user.id,pid,\'roles\')\n    accepted = db(db.auth_user.id == db.role.user)(db.role.approval_status == 1)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)\n    pending = db(db.auth_user.id == db.role.user)(db.role.approval_status == 0)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)\n    blocked = db(db.auth_user.id == db.role.user)(db.role.approval_status == 2)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)\n    return locals()\n   \ndef home_page():\n    """ home page for a user , shows list of projects he is working on and his past work """\n    uid = request.args(0)\n    #my roles \n    \n    roles = db(db.role.user == uid)(db.role.project == db.project.id).select(db.role.ALL,db.project.name) \n    myroles = [role_list[int(p.role.role)] for p in roles]\n    k = {}\n    """\n    is_coordinator = db(db.project.project_coordinator==uid).select(db.project.ALL)\n    coordinating_projects = [row.name for row in is_coordinator]\n    value=\'\'\n    for p in coordinating_projects:\n       value = value + \',\'+ p\n\t  \n    k[6] = value[1:] """\n    for row in roles:\n       if row.role.role not in k:\n          k[row.role.role] = row.project.name\n       else:\n          k[row.role.role] = k[row.role.role] + \',\' + row.project.name\n    com_exps = db(db.sample.working_status == 1)(db.sample.experimentalist == uid)(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)\n    incom_exps = db(db.sample.working_status == 1)(db.sample.experimentalist == uid)(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)\n    pub_exps = db(db.sample.working_status == 0)(db.sample.publication_status == True)(db.sample.experimentalist == uid)(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)\n    unpub_exps = db(db.sample.working_status == 0)(db.sample.publication_status == False) (db.sample.experimentalist == uid)(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)\n    for p in k:\n       list_projects = k[p].split(\',\')\n       proj = \'\' \n       for d in list_projects:\n          res = db(db.project.name == d).select(db.project.ALL).first()\n          cat = \'\'\n          if res:\n             cat = A(res.name,_href=URL(\'project_viewer\',args=res.id))\n          if proj == \'\':\n             proj=SPAN(cat)\n          else:\n           proj = SPAN(proj,\',\',cat)\n       k[p] = proj \n    return locals()\n\ndef download():\n    return response.download(request, db)\n\ndef insert_biosource():\n#prepopulating records  \n   if \'clear\' not in request.args and \'new\' in request.args:    \n    trows = db(db.template.user==auth.user.id).select()\n    count = db(db.template.user==auth.user.id).count()\n    if count > 0:\n     rows = db(db.biosource.sample_name==trows[0].sample).select()\n     count1 = db(db.biosource.sample_name==trows[0].sample).count()\n     if count1 > 0:\n      row = rows[0]      \n      for fieldname in db.biosource.fields:\n       if fieldname!=\'id\': \n        db.biosource[fieldname].default=row[fieldname]\n   elif \'clear\' in request.args: \n    request.args.pop()\n   #result = db(db.sample.id == request.args[-3]).select(db.sample.ALL).first()\n#  error = authenticate(auth.user.id,result.project,\'insert_biosource\')\n#   response.menu = [\n#   (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n#   ]\n   redirect_args = request.args[0:-3]\n   form = SQLFORM(db.biosource,style=\'bootstrap\')\n   sample_id = request.args[-4]\n   db.biosource.sample_name.readable = False\n   if \'new\' in request.args:\n               sample_id=request.args[-3]\n   samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n   if \'view\' in request.args: \n\t       form=SQLFORM(db.biosource,request.args[-1],readonly = True,showid=False,upload=URL(\'download\'))\t  \n   elif \'edit\' in request.args: \n\t       form=SQLFORM(db.biosource,request.args[-1],showid=False,upload=URL(\'download\'))\n   elif \'new\' in request.args:\n               db.biosource.sample_name.readable = False\n               hid = {}\n\t       form=SQLFORM(db.biosource,showid=False,upload=URL(\'download\'))\n\t       form.vars.sample_name = request.args[-3]\n \t       redirect_args = request.args[0:-4]\n   i=1\n   f1=form[0][:i+2]\n   fs1=form[0][i+2:i+9]\n   f2=form[0][i+9:]\n   form[0]=TABLE(TABLE(f1),\n      FIELDSET(TAG.legend("Genotype"),TABLE(fs1)),TABLE(f2))\n   if form.process().accepted:\n     redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n     response.flash="Inserted entry"\n   return locals()\n\ndef insert_pgc():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.plant_growth_condition.sample_name==trows[0].sample).select()\n    count1 = db(db.plant_growth_condition.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.plant_growth_condition.fields:\n      if fieldname!=\'id\': \n       db.plant_growth_condition[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  form = SQLFORM(db.plant_growth_condition) \n  sample_id = request.args[-4]\n  db.plant_growth_condition.sample_name.readable = False \n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n\tform=SQLFORM(db.plant_growth_condition,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n\tform=SQLFORM(db.plant_growth_condition,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n        db.plant_growth_condition.sample_name.readable = False \n\tform=SQLFORM(db.plant_growth_condition,showid=False)\n        form.vars.sample_name = request.args[-3]\n\tredirect_args = request.args[0:-2]\n  i=1\t \n  if \'view\' in request.args or \'edit\' in request.args:\n   i=1\n  fs1=form[0][:i+2]\n  fss1=form[0][i+2:i+9]\n  fs1_1=form[0][i+9:i+10]\n  fss3=form[0][i+10:i+15]\n  f2=form[0][i+15:i+17]\n  f2_1=form[0][i+17:i+18]\n  fs2=form[0][i+18:i+22]\n  fs3=form[0][i+22:i+25]\n  f3=form[0][i+25:29]\n  f4=form[0][i+28:32]\n  f4_1=form[0][i+31:39]\n  f5=form[0][i+38:]\n  t2=TABLE(FIELDSET(TAG.legend("Growth Support"),TABLE(fs1),\\\nFIELDSET(TAG.legend("Hydroponic System"),TABLE(fss1)),\\\nTABLE(fs1_1)))\n  t3=TABLE(FIELDSET(TAG.legend("Location"),TABLE(FIELDSET(TAG.legend("Field trail"),TABLE(fss3))),\\\nTABLE(FIELDSET(TAG.legend("Climate Chamber"),TABLE(f2))),\\\nTABLE(FIELDSET(TAG.legend("Green house"),TABLE(f2_1),\\\nFIELDSET(TAG.legend("Light"),TABLE(fs2)),\\\nTABLE(fs3)))\\\n))\n  t4=TABLE(FIELDSET(TAG.legend("Nutritional Regime"),TABLE(f4)))\n  t5=TABLE(FIELDSET(TAG.legend("Date of Plant Establishment(YYYY-MM-DD)"),TABLE(f4_1)))\n  form[0]=TABLE(FIELDSET(t2,t3,TABLE(f3),t4,t5,TABLE(f5)))\n  if form.process().accepted:\n    redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n    response.flash="form accepted"\n# redirect(URL(\'list_all_samples\',args=[\'sample\'])) \n  else:\n    response.flsh="form has some errors"\n  return locals()\n\ndef insert_ep():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.extraction_preparation.sample_name==trows[0].sample).select()\n    count1 = db(db.extraction_preparation.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.extraction_preparation.fields:\n      if fieldname!=\'id\': \n       db.extraction_preparation[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.extraction_preparation.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n       form=SQLFORM(db.extraction_preparation,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  if \'edit\' in request.args: \n       form=SQLFORM(db.extraction_preparation,request.args[-1],upload=URL(\'download\'),showid=False)\n  if \'new\' in request.args:\n       db.extraction_preparation.sample_name.readable=False\n       form=SQLFORM(db.extraction_preparation,showid=False)\n       form.vars.sample_name = request.args[-3]\n       redirect_args = request.args[0:-2]\t \n  i=3\n  t1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:i+8]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][i+8:i+12])))))\n  t2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][i+12:])))\n  form[0]=TABLE(FIELDSET(t1,t2))\n  if form.process().accepted:\n       response.flash="Inserted entry"\n       redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n  return locals()\n\ndef insert_treatments():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.treatments.sample_name==trows[0].sample).select()\n    count1 = db(db.treatments.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.treatments.fields:\n      if fieldname!=\'id\': \n       db.treatments[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.treatments.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n       form=SQLFORM(db.treatments,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  if \'edit\' in request.args: \n       form=SQLFORM(db.treatments,request.args[-1],upload=URL(\'download\'),showid=False)\n  if \'new\' in request.args:\n       db.treatments.sample_name.readable=False\n       form=SQLFORM(db.treatments,showid=False)\n       form.vars.sample_name = request.args[-3] \n       redirect_args = request.args[0:-2]\t \n  i=1\n  t1=TABLE(FIELDSET(TAG.legend("Treatment Factor"),TABLE(form[0][:i+2])))\n  form[0]=TABLE(FIELDSET(t1,TABLE(form[0][i+2:])))\n  if form.process().accepted:\n      response.flash="Inserted entry"\n      redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n  return locals()\n\ndef insert_harvests():\n  form = \'\'\t\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.harvests.sample_name==trows[0].sample).select()\n    count1 = db(db.harvests.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.harvests.fields:\n      if fieldname!=\'id\': \n       db.harvests[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.harvests.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n       form=SQLFORM(db.harvests,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  if \'edit\' in request.args: \n       form=SQLFORM(db.harvests,request.args[-1],upload=URL(\'download\'),showid=False)\n  if \'new\' in request.args:\n       db.harvests.sample_name.readable=False\n       form=SQLFORM(db.harvests,showid=False)\n       form.vars.sample_name = request.args[-3]\n       redirect_args = request.args[0:-2]\n  i=1\t \n  t1=TABLE(FIELDSET(TAG.legend("Sample Storage"),TABLE(form[0][i+7:i+11])))\n  form[0]=TABLE(FIELDSET(TABLE(form[0][:i+7]),t1,TABLE(form[0][i+11:])))\n  if form.process().accepted:\n      response.flash="Inserted entry"\n      redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n  return locals()\n\t  \t\ndef insert_gc():\n#prepopulating records  \n  form = \'\'\n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.gas_chromatography.sample_name==trows[0].sample).select()\n    count1 = db(db.gas_chromatography.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.gas_chromatography.fields:\n      if fieldname!=\'id\': \n       db.gas_chromatography[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.gas_chromatography.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n\tform=SQLFORM(db.gas_chromatography,request.args[-1],readonly = True,pload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n        form=SQLFORM(db.gas_chromatography,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n        db.gas_chromatography.sample_name.readable=False\n        redirect_args = request.args[0:-2]\t \n        form=SQLFORM(db.gas_chromatography,showid=False)\n        form.vars.sample_name = request.args[-3]\n  j=1\n  t_ep_1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:j+10]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][j+10:j+14])))))\n  t_ep_2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][j+14:20])))\n  i=21\n  t1=TABLE(FIELDSET(TAG.legend("GC INSTRUMENT DETAILS"),TABLE(form[0][i-1:i+3])))\n  t2=TABLE(FIELDSET(TAG.legend("DERIVATIZATION"),TABLE(form[0][i+3:i+8])))\n  t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][i+8:i+15])))\n  t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][i+15:i+23])))\n  t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][i+23:i+30])))\n  t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+30:i+34]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][i+34:i+39])))))\n  t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+39:])))\n  form[0]=TABLE(FIELDSET(t_ep_1,t_ep_2,t1,t2,t3,t4,t5,t6,t7))\n  if form.process().accepted:\n\tresponse.flash="Inserted entry"\n\tredirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n#       redirect(URL(\'list_all_samples\',args=[\'sample\'])) \n  return locals()\n\ndef insert_lc():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.liquid_chromatography.sample_name==trows[0].sample).select()\n    count1 = db(db.liquid_chromatography.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.liquid_chromatography.fields:\n      if fieldname!=\'id\': \n       db.liquid_chromatography[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  form = SQLFORM(db.liquid_chromatography)\n  sample_id = request.args[-4]\n  db.liquid_chromatography.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n      form=SQLFORM(db.liquid_chromatography,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  if \'edit\' in request.args: \n      form=SQLFORM(db.liquid_chromatography,request.args[-1],upload=URL(\'download\'),showid=False)\n  if \'new\' in request.args:\n      db.liquid_chromatography.sample_name.readable=False\n      redirect_args = request.args[0:-2]\t \n      form=SQLFORM(db.liquid_chromatography,showid=False)\n      form.vars.sample_name = request.args[-3] \n  j=1\n  t_ep_1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:j+10]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][j+10:j+14])))))\n  t_ep_2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][j+14:20])))\n  i=20\n  t1=TABLE(FIELDSET(TAG.legend("LC INSTRUMENT DETAILS"),TABLE(form[0][i:i+4])))\n  t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][i+4:i+11])))\n  t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][i+11:i+19])))\n  t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][i+19:i+26])))\n  t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+26:i+30]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][i+30:i+35])))))\n  t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+35:])))\n  form[0]=TABLE(FIELDSET(t_ep_1,t_ep_2,t1,t3,t4,t5,t6,t7))\n  if form.process().accepted:\n      response.flash="Inserted entry"\n      redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n#     redirect(URL(\'list_all_samples\',args=[\'sample\'])) \n  return locals()\n\ndef insert_ms():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.mass_spectroscopy.sample_name==trows[0].sample).select()\n    count1 = db(db.mass_spectroscopy.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.mass_spectroscopy.fields:\n      if fieldname!=\'id\': \n       db.mass_spectroscopy[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.mass_spectroscopy.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n    form=SQLFORM(db.mass_spectroscopy,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n    form=SQLFORM(db.mass_spectroscopy,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n    db.mass_spectroscopy.sample_name.readable=False\n    redirect_args = request.args[0:-2]\t \n    form=SQLFORM(db.mass_spectroscopy,showid=False)\n    form.vars.sample_name = request.args[-3]\n  i=0\n  t1=TABLE(FIELDSET(TAG.legend("INSTRUMENTAL DETAILS"),TABLE(form[0][:i+4])))\n  t2=TABLE(FIELDSET(TAG.legend("IONISATION SOURCE"),TABLE(form[0][i+4:i+10])))\n  t3=TABLE(FIELDSET(TAG.legend("MASS ANALYZER"),TABLE(form[0][i+10:i+17]),TABLE(FIELDSET(TAG.legend("Lock spray"),TABLE(form[0][i+17:i+21]))),TABLE(form[0][i+21:i+22])))\n  t4=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+22:i+27])))\n  t5=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+27:])))\n  form[0]=TABLE(FIELDSET(t1,t2,t3,t4,t5))\n  if form.process().accepted:\n      \tresponse.flash="Inserted entry"\n        redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n#     \tredirect(URL(\'list_all_samples\'),args=[\'sample\']) \n  return locals()\n\ndef insert_raw_data():\n#prepopulating records  \n  if False:    \n    trows = db(db.template.user==auth.user.id).select()\n    count = db(db.template.user==auth.user.id).count()\n    if count > 0:\n      rows = db(db.raw_data_storage_information.sample_name==trows[0].sample).select()\n      count1 = db(db.raw_data_storage_information.sample_name==trows[0].sample).count()\n      if count1 > 0:\n       row = rows[0]\n       for fieldname in db.raw_data_storage_information.fields:\n        if fieldname!=\'id\': \n         db.raw_data_storage_information[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.raw_data_storage_information.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n    form=SQLFORM(db.raw_data_storage_information,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n    form=SQLFORM(db.raw_data_storage_information,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n    db.raw_data_storage_information.sample_name.readable=False\n    redirect_args = request.args[0:-2]\t \n    form=SQLFORM(db.raw_data_storage_information,showid=False)\n    form.vars.sample_name = request.args[-3]\n    form.vars.email_id_of_person=auth.user.email \n  if form.process().accepted:\n      \tresponse.flash="Inserted entry"\n        redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n#     \tredirect(URL(\'list_all_samples\'),args=[\'sample\']) \n  return locals()\n\ndef insert_spectrophotometry():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.spectrophotometry.sample_name==trows[0].sample).select()\n    count1 = db(db.spectrophotometry.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.spectrophotometry.fields:\n      if fieldname!=\'id\': \n       db.spectrophotometry[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\t \n  sample_id = request.args[-4]\n  db.spectrophotometry.sample_name.readable=False\n  if \'new\' in request.args:\n               sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n    form=SQLFORM(db.spectrophotometry,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n    form=SQLFORM(db.spectrophotometry,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n    db.spectrophotometry.sample_name.readable=False\n    redirect_args = request.args[0:-2]\t \n    form=SQLFORM(db.spectrophotometry,showid=False)\n    form.vars.sample_name = request.args[-3]\n  if form.process().accepted:\n      \tresponse.flash="Inserted entry"\n        redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n#     \tredirect(URL(\'list_all_samples\'),args=[\'sample\']) \n  return locals()\n\n\n@auth.requires_signature()\ndef data():\n    """\n    http://..../[app]/default/data/tables\n    http://..../[app]/default/data/create/[table]\n    http://..../[app]/default/data/read/[table]/[id]\n    http://..../[app]/default/data/update/[table]/[id]\n    http://..../[app]/default/data/delete/[table]/[id]\n    http://..../[app]/default/data/select/[table]\n    http://..../[app]/default/data/search/[table]\n    but URLs must be signed, i.e. linked with\n      A(\'table\',_href=URL(\'data/tables\',user_signature=True))\n    or with the signed load operator\n      LOAD(\'default\',\'data.load\',args=\'tables\',ajax=True,user_signature=True)\n    """\n    return dict(form=crud())\n\n#def drop_tables():\n    #are you sure you want to do this?\n    #for t in [\'auth_user\',\'auth_group\', \'auth_membership\', \'auth_permission\', \'auth_event\',\'sample\',\'biosource\',\'affiliation\',\'project\',\'role\',\'template\',\'experiment\',\'project_meta\',\'plant_growth_condition\',\'treatments\',\'harvests\',\'extraction_preparation\',\'gas_chromatography\',\'liquid_chromatography\',\'mass_spectroscopy\',\'spectrophotometry\',\'feedback\',\'sample_files\']:\n    #    db[t].drop()\n    # pass\n    #return \n\ndef show_feedback():\n    grid = SQLFORM.smartgrid(db.feedback)\n    return locals()\n\n \ndef post_feedback():\n    """ allows to post feedback to the table feedback """ \n    past_feeds = db(db.feedback.feedback_on == request.env.http_referer).select(db.feedback.feedback_body,db.feedback.id)\n    form = SQLFORM(db.feedback,fields=[\'feedback_body\'],labels={\'feedback_body\':\'Your feedback about this page\'})\n    feedback_by = \'\'\n    if form.validate():\n\tif auth.user:\n            feedback_by = auth.user.id\n        else:\n\t   feedback_by = \'\'\n\tdb.feedback.insert(feedback_on=request.env.http_referer,feedback_body=form.vars.feedback_body,feedback_by=feedback_by)\n\tresponse.flash = "feedback has been duly noted and will be taken care of "\n    return locals()\n\n\ndef user_viewer():\n   """shows the user details """\n   uid = request.args(0)\n   record = db.auth_user(uid)\n   form = SQLFORM(db.auth_user,record,readonly=True,showid=False,fields=[\'first_name\',\'last_name\',\'email\',\'affiliated_to\',\'phone\',\'mobile\',\'city\'])\n   return locals()\n\n\ndef dict_dump(obj,inp):\n  ans = \'<dl class="dl-horizontal">\'\n  for key in inp.keys():\n     add = \'<dt>\'+str(inp[key])+\'</dt>\'+\'<dd>\'+str(obj[key])+\'</dd>\'\n     ans = ans+add\n  return ans\t\n\n\ndef sample():\n  """gets all the information regarding a sample in a single page """\n  sid = request.args[-1]\n  sample = db(db.sample.id == sid).select(db.sample.ALL).first()\n  user = db(db.auth_user.id == sample.experimentalist).select(db.auth_user.ALL).first()\n  grouping = db(db.grouping.id == sample.grouping).select(db.grouping.ALL).first()\n  biosource = db(db.biosource.sample_name == sid).select(db.biosource.ALL)\n  plant_growth = db(db.plant_growth_condition.sample_name == sid).select(db.plant_growth_condition.ALL)\n  treatment = db(db.treatments.sample_name == sid).select(db.treatments.ALL)\n  harvest = db(db.harvests.sample_name == sid).select(db.harvests.ALL)\n  extraction_preparation = db(db.extraction_preparation.sample_name == sid).select(db.extraction_preparation.ALL)\n  gc = db(db.gas_chromatography.sample_name == sid).select(db.gas_chromatography.ALL)\n  lc = db(db.liquid_chromatography.sample_name == sid).select(db.liquid_chromatography.ALL)\n  ms = db(db.mass_spectroscopy.sample_name == sid).select(db.mass_spectroscopy.ALL)\n  raw_storage = db(db.raw_data_storage_information.sample_name == sid).select(db.raw_data_storage_information.ALL)\n  biosource_forms = [] #a list of forms\n  for each in biosource:\n\tform = SQLFORM(db.biosource,each.id,showid=False,readonly=True)\n\ti=1\n\tf1=form[0][:i+2]\n\tfs1=form[0][i+2:i+7]\n\tf2=form[0][i+7:]\n\tform[0]=TABLE(TABLE(f1),FIELDSET(TAG.legend("Genotype"),TABLE(fs1)),TABLE(f2))\n\tbiosource_forms.append(form[0])\n        \n  pgc_forms = []\n  for each in plant_growth:\n     form = SQLFORM(db.plant_growth_condition,each.id,showid=False,readonly=True)\n     i=1\n     fs1=form[0][:i+5]\n     fss1=form[0][i+5:i+9]\n     fss2=form[0][i+9:i+10]\n     fss3=form[0][i+10:i+15]\n     f2=form[0][i+15:i+18]\n     fs2=form[0][i+18:i+21]\n     fs3=form[0][i+21:i+27]\n     f3=form[0][i+27:]\n     t2=TABLE(FIELDSET(TAG.legend("Growth Support"),TABLE(fs1)))\n     t3=TABLE(FIELDSET(TAG.legend("Location"),TABLE(FIELDSET(TAG.legend("Field trail"),TABLE(fss1))),TABLE(fss2),TABLE(FIELDSET(TAG.legend("Green house"),TABLE(fss3)))))\n     t4=TABLE(FIELDSET(TAG.legend("Nutritional Regime"),TABLE(fs2)))\n     t5=TABLE(FIELDSET(TAG.legend("Date of Plant Establishment(YYYY-MM-DD)"),TABLE(fs3)))\n     form[0]=TABLE(FIELDSET(t2,t3,TABLE(f2),t4,t5,TABLE(f3)))\n     pgc_forms.append(form[0])\n  \n  treatment_forms = []\n  for each in treatment:\n     form = SQLFORM(db.treatments,each.id,showid=False,readonly=True)\n     i=1\n     t1=TABLE(FIELDSET(TAG.legend("Treatment Factor"),TABLE(form[0][:i+3])))\n     form[0]=TABLE(FIELDSET(t1,TABLE(form[0][i+3:])))\n\n\n  harvest_forms = []\n  for each in harvest:\n     form = SQLFORM(db.harvests,each.id,showid=False,readonly=True)\n     i=1\n     t1=TABLE(FIELDSET(TAG.legend("Sample Storage"),TABLE(form[0][i+7:])))\n     form[0]=TABLE(FIELDSET(TABLE(form[0][:i+7]),t1))\n     harvest_forms.append(form[0])\n\n  gc_forms = []\n  for each in gc:\n     form = SQLFORM(db.gas_chromatography,each.id,showid=False,readonly=True)\n     j=1\n     t_ep_1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:j+7]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][j+7:j+11])))))\n     t_ep_2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][j+11:15])))\n     i=15\n     t1=TABLE(FIELDSET(TAG.legend("CHROMATOGRAPHY INSTRUMENTAL"),TABLE(form[0][15:i+4])))\n     t2=TABLE(FIELDSET(TAG.legend("DERIVATIZATION"),TABLE(form[0][i+4:i+8])))\n     t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][i+8:i+15])))\n     t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][i+15:i+23])))\n     t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][i+23:i+30])))\n     t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+30:i+33]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][i+33:i+37])))))\n     t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+37:])))\n     form[0]=TABLE(FIELDSET(t_ep_1,t_ep_2,t1,t2,t3,t4,t5,t6,t7))\n\n     gc_forms.append(form[0])\n \n  lc_forms = []\n  \n  for each in lc:\n    form = SQLFORM(db.gas_chromatography,each.id,showid=False,readonly=True)\n    j=1\n    t_ep_1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:j+7]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][j+7:j+11])))))\n    t_ep_2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][j+11:15])))\n    i=15\n    t1=TABLE(FIELDSET(TAG.legend("CHROMATOGRAPHY INSTRUMENTAL"),TABLE(form[0][15:i+4])))\n    t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][i+4:i+11])))\n    t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][i+11:i+19])))\n    t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][i+19:i+26])))\n    t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+26:i+29]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][i+29:i+33])))))\n    t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+33:])))\n    form[0]=TABLE(FIELDSET(t_ep_1,t_ep_2,t1,t3,t4,t5,t6,t7))\n    lc_forms.append(form[0])\n \n  ms_forms = []\n  for each in ms:\n    form = SQLFORM(db.mass_spectroscopy,each.id,showid=False,readonly=True)\n    i=1\n    t1=TABLE(FIELDSET(TAG.legend("INSTRUMENTAL DETAILS"),TABLE(form[0][:i+4])))\n    t2=TABLE(FIELDSET(TAG.legend("IONISATION SOURCE"),TABLE(form[0][i+4:i+10])))\n    t3=TABLE(FIELDSET(TAG.legend("MASS ANALYZER"),TABLE(form[0][i+10:i+18]),TABLE(FIELDSET(TAG.legend("Lock spray"),TABLE(form[0][i+18:i+22]))),TABLE(form[0][i+22:i+23])))\n    t4=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][i+23:i+27])))\n    t5=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][i+27:])))\n    form[0]=TABLE(FIELDSET(t1,t2,t3,t4,t5))  \n    ms_forms.append(form[0])\n\n  raw_forms = []\n  for each in raw_storage:\n     form = SQLFORM(db.raw_data_storage_information,each.id,showid=False,readonly=True)\n     raw_forms.append(form[0])\n\n\n  return locals() \n\n#def grid():\n  # query=((db.project.project_status==0)&(db.experiment.project==db.project.id)&(db.sample.experiment==db.experiment.id)&(db.biosource.sample_name==db.sample.id))\n   #query=((db.sample.project==db.project.id)&(db.project.id>0))\n   #query=((db.project.id>0)&(db.sample.project==db.project.id)&((db.sample.id==db.biosource.sample_name)&(db.sample.id==db.plant_growth_condition.sample_name)))\n#   query=((db.sample.experiment==db.experiment.id)&((db.sample.id==db.biosource.sample_name)|(db.sample.id==db.plant_growth_condition.sample_name)))\n#   grid = SQLFORM.grid(query)\n#   return locals()\n\n\ndef search():\n    form=FORM(\'Your name:\',\n              INPUT(_name=\'name\', requires=IS_NOT_EMPTY()),\n              INPUT(_type=\'submit\'))\n    if form.accepts(request,session):\n      redirect(URL(\'sample\',args=form.vars.name)) \n    return locals()\n    \n\ndef multiple_files():\n   """allows an experimentalist to add multiple images and files and displays it in the consolidated sample view form """\n   """ per sample . takes id of the sample as the input """\n   sid = request.args(0)\n   sample = db(db.sample.id == sid).select().first() \n   old = db(db.sample_files.sample == sid).select(db.sample_files.ALL)\n   form = SQLFORM(db.sample_files)\n#   grid = SQLFORM.grid(db.sample_files.sample == sid)\n   form.vars.sample = sid\n   form.vars.user= auth.user.id \n   if request.vars.file!=None:\n      if not isinstance(request.vars.file,str):\n         form.vars.file_name = request.vars.file.filename\n      \n   if form.process().accepted:\n      response.flash = \'File added\'\n   elif form.errors:\n      response.flash = \'Errors in form please check it out\'\n   return locals()\n\n\n\n@auth.requires_login()\ndef delete():\n    file_id = request.args[0]\n    record = db.sample_files[file_id]\n    if record.user == auth.user.id:\n       """do something"""\n       db(db.sample_files.id == record.id).delete()\t\n       redirect(URL(\'multiple_files\',args=record.sample))\t\n    else:\n       error = \'You are not allowed to meddle with other users\\\' files\'\t\n    return locals\n\n@auth.requires_login()\ndef insert_task():\n\n    form = SQLFORM(db.task)\n    if form.process().accepted:\n      db.task.insert(user=auth.user.id,status=0,start_time=request.now,end_time=None,peak_detection_method=form.vars.peak_detection_method,ppm=form.vars.ppm,min_peak_width=form.vars.min_peak_width,max_peak_width=form.vars.max_peak_width,step_size=form.vars.step_size,fwhm=form.vars.fwhm,alignment_method=form.vars.alignment_method,mzwid=form.vars.mzwid,minfrac=form.vars.minfrac,bw=form.vars.bw,retention_time_method=form.vars.retention_time_method,peak_groups_method=form.vars.peak_groups_method)\n      redirect(URL(\'default\',\'mytasks\'))   \n    return locals()\n\n\n\ndef mytasks():\n\n    response.menu = [\n      (T(\'Home\'), False, URL(\'default\',\'list_all_dev_projects\',args=auth.user.id), []),\n      (T(\'Tasks\'), False, URL(\'default\',\'mytasks\'), [\n      (T(\'Insert task\'), False, URL(\'default\', \'insert_task\'))]\n      ),\n      ]\n    queued = db((db.task.user == auth.user.id) &(db.task.status == 0)).select()\n    other = db((db.task.user == auth.user.id) & (db.task.status != 0)).select()\n    status_list = [\'Queued\',\'Running\',\'Completed\',\'Failed\'] \n    return locals()\n\n\ndef task_viewer():\n    tid = request.args(0)\n    """check for permissions """\n    task = db.task[tid]\n    status_list = [\'Queued\',\'Running\',\'Completed\',\'Aborted\']\n    pdm = [\'Cent Wave\',\'Matched Filter\']\n    alignment_method = [\'Density\',\'mzClust\',\'Nearest\']\n    ret= [\'Peak groups\',\'ObiWarp\']\n\n    if task.user != auth.user.id:\n       return "You are not allowed to view others\' tasks"\n    else:\n      pass\n    return locals()\n\ndef insert_nmr():\n#prepopulating records  \n  if \'clear\' not in request.args and \'new\' in request.args:    \n   trows = db(db.template.user==auth.user.id).select()\n   count = db(db.template.user==auth.user.id).count()\n   if count > 0:\n    rows = db(db.nmr_attributes.sample_name==trows[0].sample).select()\n    count1 = db(db.nmr_attributes.sample_name==trows[0].sample).count()\n    if count1 > 0:\n     row = rows[0]\n     for fieldname in db.nmr_attributes.fields:\n      if fieldname!=\'id\': \n       db.nmr_attributes[fieldname].default=row[fieldname]\n  elif \'clear\' in request.args: \n    request.args.pop()\n  #result = db(db.sample.id == request.args[-1]).select(db.sample.ALL).first()\n  response.menu = [\n  (T(\'Home\'), False, URL(\'default\',\'list_all_projects\'), [])\n  ]\n  redirect_args = request.args[0:-3]\n  form = SQLFORM(db.nmr_attributes) \n  sample_id = request.args[-4]\n  db.nmr_attributes.sample_name.readable = False \n  if \'new\' in request.args:\n    sample_id=request.args[-3]\n  samp = db(db.sample.id==sample_id).select(db.sample.experimentalist,db.sample.name,db.sample.code,db.sample.replica).first()\n  if \'view\' in request.args: \n\tform=SQLFORM(db.nmr_attributes,request.args[-1],readonly = True,upload=URL(\'download\'),showid=False)\n  elif \'edit\' in request.args: \n\tform=SQLFORM(db.nmr_attributes,request.args[-1],upload=URL(\'download\'),showid=False)\n  elif \'new\' in request.args:\n    db.nmr_attributes.sample_name.readable = False\n    form=SQLFORM(db.nmr_attributes,showid=False)\n    form.vars.sample_name = request.args[-3]\n    redirect_args = request.args[0:-2]\n  i=1\t \n  if \'view\' in request.args or \'edit\' in request.args:\n   i=1\n  f1s1=form[0][:i+12] #\n  f2s1=form[0][i+12:i+13] #\n  f2s2=form[0][i+13:i+17]\n  f2s3=form[0][i+17:i+21]\n  f2s4=form[0][i+21:i+24]\n  f2s5=form[0][i+24:i+31]\n  f2s6=form[0][i+31:i+36]\n  f3s1=form[0][i+36:i+49] #\n  f3s2=form[0][i+49:i+54]\n  f3s3=form[0][i+54:i+55]\n  f3s4=form[0][i+55:i+57]\n  f4s1=form[0][i+57:i+60] #\n  f5s1=form[0][i+60:i+63] #\n  f5s2=form[0][i+63:i+70]\n  f5s3=form[0][i+70:i+71]\n  f5s4=form[0][i+71:i+73]\n  f5s5=form[0][i+73:i+75]\n  f5s6=form[0][i+75:i+77]\n  f5s7=form[0][i+77:i+79]\n  f5s8=form[0][i+79:i+83]\n  f6s1=form[0][i+83:i+89] #\n  f6s2=form[0][i+89:i+90]\n  f6s3=form[0][i+90:i+97]\n  f6s4=form[0][i+97:i+103]\n  f6s5=form[0][i+103:i+110]\n  f6s6=form[0][i+110:i+116]\n  f6s7=form[0][i+116:i+120]\n  f6s8=form[0][i+120:i+124]\n\n  t1 = TABLE(FIELDSET(TAG.legend("NMR ATTRIBUTES FOR SAMPLE DATA"),FIELDSET(TAG.legend("NMR sample"),TABLE(f1s1))))\n  t2 = TABLE(FIELDSET(TAG.legend("NMR ATTRIBUTES FOR INSTRUMENT"),TABLE(f2s1),FIELDSET(TAG.legend("Magnet"),TABLE(f2s2)),FIELDSET(TAG.legend("Probe"),TABLE(f2s3)),FIELDSET(TAG.legend("Console"),TABLE(f2s4)),FIELDSET(TAG.legend("Acquisition computer"),TABLE(f2s5)),FIELDSET(TAG.legend("Autosampler"),TABLE(f2s6))))\n  t3 = TABLE(FIELDSET(TAG.legend("INSTRUMENT ACQUISITION PARAMETERS"),FIELDSET(TAG.legend("Acquisition parameter set"),TABLE(f3s1)),FIELDSET(TAG.legend("Acquisition parameters recorded for each dimension"),TABLE(f3s2)),FIELDSET(TAG.legend("Acquisition parameters recorded for second and higher dimensions"),TABLE(f3s3)),FIELDSET(TAG.legend("Shaped pulse parameters"),TABLE(f3s4))))\n  t4 = TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(f4s1)))\n  t5 = TABLE(FIELDSET(TAG.legend("NMR ATTRIBUTES FOR DATA PROCESSING"),FIELDSET(TAG.legend("FID & Spectral Processing Parameter Set"),TABLE(f5s1)),FIELDSET(TAG.legend("Processing Parameters Recorded for Each Dimension"),TABLE(f5s2)),FIELDSET(TAG.legend("Window function parameters"),TABLE(f5s3)),FIELDSET(TAG.legend("Parameter to window function parameters"),TABLE(f5s4)),FIELDSET(TAG.legend("2D J-Resolved processing parameters"),TABLE(f5s5)),FIELDSET(TAG.legend("Processing software parameters"),TABLE(f5s6)),FIELDSET(TAG.legend("Spectral projection parameters"),TABLE(f5s7)),FIELDSET(TAG.legend("Spectral quantitation data set"),TABLE(f5s8))))\n  t6 = TABLE(FIELDSET(TAG.legend("ATTRIBUTES FOR DATA SETS"),FIELDSET(TAG.legend("1D FID Data Set"),TABLE(f6s1)),FIELDSET(TAG.legend("FID File Reference"),TABLE(f6s2)),FIELDSET(TAG.legend("2D FID Data Set"),TABLE(f6s3)),FIELDSET(TAG.legend("1D Spectrum"),TABLE(f6s4)),FIELDSET(TAG.legend("2D Spectrum"),TABLE(f6s5)),FIELDSET(TAG.legend("2D Projected Spectrum"),TABLE(f6s6)),FIELDSET(TAG.legend("Bucketed Spectrum"),TABLE(f6s7)),FIELDSET(TAG.legend("Peak-picked Spectrum"),TABLE(f6s8))))\n\n  form[0]=TABLE(FIELDSET(t1,t2,t3,t4,t5,t6))\n  if form.process().accepted:\n    redirect(URL(\'list_all_dev_projects\',args=redirect_args)) \n    response.flash="form accepted"\n# redirect(URL(\'list_all_samples\',args=[\'sample\'])) \n  else:\n    response.flsh="form has some errors"\n  return locals()\n  \ndef nmrform():\n    form = SQLFORM(db.nmr_attributes)\n    form.vars.sample_name=request.args[0]\n    record = db.nmr_attributes(request.args(0))\n    updateform = SQLFORM(db.nmr_attributes,record)\n    \n    if form.process().accepted:\n        response.flash = \'done.\'\n    return locals()\n    \ndef update_nmr_form():\n    \n    \n    if updateform.process().accepted:\n        response.flash = \'updated\'\n    return locals()\n\ndef instrument_form():\n    instrument_id = 1\n    query = db().select(db.instrument.id == instrument_id)\n    form = SQLFORM.factory(Field(\'sampletest\',default=query[1]))\n    return dict(form=form)\n\nresponse._vars=response._caller(instrument_form)\n'
+p7
+sS'snapshot'
+p8
+(dp9
+S'exception'
+p10
+(dp11
+S'__hash__'
+p12
+S"<method-wrapper '__hash__' of exceptions.AttributeError object>"
+p13
+sS'__setattr__'
+p14
+S"<method-wrapper '__setattr__' of exceptions.AttributeError object>"
+p15
+sS'__reduce_ex__'
+p16
+S'<built-in method __reduce_ex__ of exceptions.AttributeError object>'
+p17
+sS'__getslice__'
+p18
+S"<method-wrapper '__getslice__' of exceptions.AttributeError object>"
+p19
+sS'__getitem__'
+p20
+S"<method-wrapper '__getitem__' of exceptions.AttributeError object>"
+p21
+sS'__setstate__'
+p22
+S'<built-in method __setstate__ of exceptions.AttributeError object>'
+p23
+sS'__reduce__'
+p24
+S'<built-in method __reduce__ of exceptions.AttributeError object>'
+p25
+sS'__str__'
+p26
+S"<method-wrapper '__str__' of exceptions.AttributeError object>"
+p27
+sS'__format__'
+p28
+S'<built-in method __format__ of exceptions.AttributeError object>'
+p29
+sS'__getattribute__'
+p30
+S"<method-wrapper '__getattribute__' of exceptions.AttributeError object>"
+p31
+sS'__class__'
+p32
+S"<type 'exceptions.AttributeError'>"
+p33
+sS'__unicode__'
+p34
+S'<built-in method __unicode__ of exceptions.AttributeError object>'
+p35
+sS'__delattr__'
+p36
+S"<method-wrapper '__delattr__' of exceptions.AttributeError object>"
+p37
+sS'__subclasshook__'
+p38
+S'<built-in method __subclasshook__ of type object>'
+p39
+sS'__repr__'
+p40
+S"<method-wrapper '__repr__' of exceptions.AttributeError object>"
+p41
+sS'args'
+p42
+S'("\'Query\' object has no attribute \'type\'",)'
+p43
+sS'__dict__'
+p44
+S'{}'
+p45
+sS'__sizeof__'
+p46
+S'<built-in method __sizeof__ of exceptions.AttributeError object>'
+p47
+sS'__doc__'
+p48
+S"'Attribute not found.'"
+p49
+sS'__init__'
+p50
+S"<method-wrapper '__init__' of exceptions.AttributeError object>"
+p51
+sS'__new__'
+p52
+S'<built-in method __new__ of type object>'
+p53
+ssS'evalue'
+p54
+S"'Query' object has no attribute 'type'"
+p55
+sS'request'
+p56
+cgluon.html
+XML_unpickle
+p57
+(S's\x11^\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">ajax</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">application</td><td valign="top">:</td><td><div>volt</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x96496a0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cid</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">client</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">controller</td><td valign="top">:</td><td><div>default</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">session_id_admin</td><td valign="top">:</td><td><div>127.0.0.1-e167bc34-1f25-41ae-8313-aa997ad79100<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_lims_m4</td><td valign="top">:</td><td><div>127.0.0.1-b5987439-3307-46ef-afed-fc267bb58098<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_trytask</td><td valign="top">:</td><td><div>127.0.0.1-bf929c28-629d-4cd7-8be0-d4f2f07cfb61<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_volt</td><td valign="top">:</td><td><div>127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_welcome</td><td valign="top">:</td><td><div>127.0.0.1-8d149d02-050e-4979-a759-0a781641253b<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">env</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/lavya/web2py/applications/welcome/&#x27;, &#x27;/home/lavya/web2py/applications/admin/&#x27;, &#x27;/home/lavya/web2py/applications/trytask/&#x27;, &#x27;/home/lavya/web2py/applications/volt/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/lavya/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_options</td><td valign="top">:</td><td><div>&lt;Values at 0x91c06ec: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [&#x27;127.0.1.1&#x27;], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;with_coverage&#x27;: False, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;biolab&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;httpserver.pid&#x27;, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;/home/lavya/web2py&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;import_models&#x27;: False, &#x27;winservice&#x27;: &#x27;&#x27;, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;profiler_filename&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;scheduler_groups&#x27;: None, &#x27;password&#x27;: &#x27;&lt;ask&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;interfaces&#x27;: None, &#x27;minthreads&#x27;: None, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/lavya/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_encoding</td><td valign="top">:</td><td><div>gzip,deflate,sdch</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_language</td><td valign="top">:</td><td><div>en-US,en;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_connection</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_cookie</td><td valign="top">:</td><td><div>session_id_lims_m4=127.0.0.1-b5987439-3307-46ef-afed-fc267bb58098; session_id_welcome=127.0.0.1-8d149d02-050e-4979-a759-0a781641253b; session_id_trytask=127.0.0.1-bf929c28-629d-4cd7-8be0-d4f2f07cfb61; session_id_volt=127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c; session_id_admin=127.0.0.1-e167bc34-1f25-41ae-8313-aa997ad79100</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_host</td><td valign="top">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_referer</td><td valign="top">:</td><td><div>http://127.0.0.1:8000/admin/default/edit/volt/controllers/default.py?id=controllers__default__py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_user_agent</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/28.0.1500.71 Chrome/28.0.1500.71 Safari/537.36</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>biolab</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path_info</td><td valign="top">:</td><td><div>/volt/default/instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">query_string</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_addr</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_port</td><td valign="top">:</td><td><div>51872</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_method</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_uri</td><td valign="top">:</td><td><div>/volt/default/instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">script_name</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_name</td><td valign="top">:</td><td><div>biolab</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_port</td><td valign="top">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_protocol</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_software</td><td valign="top">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_path</td><td valign="top">:</td><td><div>/home/lavya/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div>2.5.1-stable+timestamp.2013.06.06.15.39.19</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_errors</td><td valign="top">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0xb72bb0d0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_file_wrapper</td><td valign="top">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x91773ec&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_input</td><td valign="top">:</td><td><div>&lt;socket._fileobject object at 0xad8bc8ec&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_version</td><td valign="top">:</td><td><div><table><tr><td><div>1</div></td></tr><tr><td><div>0</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">extension</td><td valign="top">:</td><td><div>html</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">folder</td><td valign="top">:</td><td><div>/home/lavya/web2py/applications/volt/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">function</td><td valign="top">:</td><td><div>instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">get_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">global_settings</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/lavya/web2py/applications/welcome/&#x27;, &#x27;/home/lavya/web2py/applications/admin/&#x27;, &#x27;/home/lavya/web2py/applications/trytask/&#x27;, &#x27;/home/lavya/web2py/applications/volt/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/lavya/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_options</td><td valign="top">:</td><td><div>&lt;Values at 0x91c06ec: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [&#x27;127.0.1.1&#x27;], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;with_coverage&#x27;: False, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;biolab&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;httpserver.pid&#x27;, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;/home/lavya/web2py&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;import_models&#x27;: False, &#x27;winservice&#x27;: &#x27;&#x27;, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;profiler_filename&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;scheduler_groups&#x27;: None, &#x27;password&#x27;: &#x27;&lt;ask&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;interfaces&#x27;: None, &#x27;minthreads&#x27;: None, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/lavya/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>biolab</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div>2.5.1-stable+timestamp.2013.06.06.15.39.19</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_https</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_local</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_restful</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">now</td><td valign="top">:</td><td><div>datetime.datetime(2013, 8, 2, 21, 7, 37, 272840)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">post_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_args</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_extension</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">url</td><td valign="top">:</td><td><div>/volt/default/instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">utcnow</td><td valign="top">:</td><td><div>datetime.datetime(2013, 8, 2, 15, 37, 37, 272861)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">uuid</td><td valign="top">:</td><td><div>volt/127.0.0.1.2013-08-02.21-07-37.dc428deb-299c-44cc-a53a-06f72c0e8110</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">environ</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_ENCODING</td><td valign="top">:</td><td><div>gzip,deflate,sdch</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_LANGUAGE</td><td valign="top">:</td><td><div>en-US,en;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_CONNECTION</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_COOKIE</td><td valign="top">:</td><td><div>session_id_lims_m4=127.0.0.1-b5987439-3307-46ef-afed-fc267bb58098; session_id_welcome=127.0.0.1-8d149d02-050e-4979-a759-0a781641253b; session_id_trytask=127.0.0.1-bf929c28-629d-4cd7-8be0-d4f2f07cfb61; session_id_volt=127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c; session_id_admin=127.0.0.1-e167bc34-1f25-41ae-8313-aa997ad79100</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_HOST</td><td valign="top">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_REFERER</td><td valign="top">:</td><td><div>http://127.0.0.1:8000/admin/default/edit/volt/controllers/default.py?id=controllers__default__py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_USER_AGENT</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/28.0.1500.71 Chrome/28.0.1500.71 Safari/537.36</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">PATH_INFO</td><td valign="top">:</td><td><div>/volt/default/instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">QUERY_STRING</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_ADDR</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_PORT</td><td valign="top">:</td><td><div>51872</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_METHOD</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_URI</td><td valign="top">:</td><td><div>/volt/default/instrument_form</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SCRIPT_NAME</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_NAME</td><td valign="top">:</td><td><div>biolab</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PORT</td><td valign="top">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PROTOCOL</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_SOFTWARE</td><td valign="top">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.errors</td><td valign="top">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0xb72bb0d0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.file_wrapper</td><td valign="top">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x91773ec&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.input</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x96496a0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.version</td><td valign="top">:</td><td><div>1</div></td></tr></table></div></td></tr></table></div></td></tr></table></div>'
+tRp58
+sS'frames'
+p59
+(lp60
+(dp61
+S'file'
+p62
+S'/home/lavya/web2py/gluon/restricted.py'
+p63
+sS'dump'
+p64
+(dp65
+S'environment'
+p66
+S"{'A': <class 'gluon.html.A'>, 'ANY_OF': <class 'gluon.validators.ANY_OF'>, 'Auth': <class 'gluon.tools.Auth'>, 'B': <class 'gluon.html.B'>, 'BEAUTIFY': <class 'gluon.html.BEAUTIFY'>, 'BODY': <class 'gluon.html.BODY'>, 'BR': <class 'gluon.html.BR'>, 'BUTTON': <class 'gluon.html.BUTTON'>, 'CAT': <class 'gluon.html.CAT'>, 'CENTER': <class 'gluon.html.CENTER'>, ...}"
+p67
+sS'ccode'
+p68
+S'<code object <module> at 0xab796b60, file "/home...plications/volt/controllers/default.py", line 16>'
+p69
+ssS'lnum'
+p70
+I212
+sS'lines'
+p71
+(dp72
+I207
+S'    try:'
+p73
+sI208
+S'        if isinstance(code, types.CodeType):'
+p74
+sI209
+S'            ccode = code'
+p75
+sI210
+S'        else:'
+p76
+sI211
+S'            ccode = compile2(code, layer)'
+p77
+sI212
+S'        exec ccode in environment'
+p78
+sI213
+S'    except HTTP:'
+p79
+sI214
+S'        raise'
+p80
+sI215
+S'    except RestrictedError:'
+p81
+sI216
+S'        # do not encapsulate (obfuscate) the original RestrictedError'
+p82
+ssS'call'
+p83
+S"(code='# -*- coding: utf-8 -*-\\n# this file is released ...response._vars=response._caller(instrument_form)\\n', environment={'A': <class 'gluon.html.A'>, 'ANY_OF': <class 'gluon.validators.ANY_OF'>, 'Auth': <class 'gluon.tools.Auth'>, 'B': <class 'gluon.html.B'>, 'BEAUTIFY': <class 'gluon.html.BEAUTIFY'>, 'BODY': <class 'gluon.html.BODY'>, 'BR': <class 'gluon.html.BR'>, 'BUTTON': <class 'gluon.html.BUTTON'>, 'CAT': <class 'gluon.html.CAT'>, 'CENTER': <class 'gluon.html.CENTER'>, ...}, layer='/home/lavya/web2py/applications/volt/controllers/default.py')"
+p84
+sS'func'
+p85
+S'restricted'
+p86
+sa(dp87
+g62
+S'/home/lavya/web2py/applications/volt/controllers/default.py'
+p88
+sg64
+(dp89
+sg70
+I1558
+sg71
+(dp90
+I1547
+S''
+sI1548
+S'    if updateform.process().accepted:'
+p91
+sI1549
+S"        response.flash = 'updated'"
+p92
+sI1550
+S'    return locals()'
+p93
+sI1551
+S''
+sI1552
+S'def instrument_form():'
+p94
+sI1553
+S'    instrument_id = 1'
+p95
+sI1554
+S'    query = db().select(db.instrument.id == instrument_id)'
+p96
+sI1555
+S"    form = SQLFORM.factory(Field('sampletest',default=query[1]))"
+p97
+sI1556
+S'    return dict(form=form)'
+p98
+ssg83
+S'()'
+p99
+sg85
+S'<module>'
+p100
+sa(dp101
+g62
+S'/home/lavya/web2py/gluon/globals.py'
+p102
+sg64
+(dp103
+S'self'
+p104
+S'undefined'
+p105
+sS'f'
+S'<function instrument_form>'
+p106
+ssg70
+I194
+sg71
+(dp107
+I192
+S"        self.delimiters = ('{{', '}}')"
+p108
+sI193
+S'        self._vars = None'
+p109
+sI194
+S'        self._caller = lambda f: f()'
+p110
+sI195
+S'        self._view_environment = None'
+p111
+sI196
+S'        self._custom_commit = None'
+p112
+sI197
+S'        self._custom_rollback = None'
+p113
+sI198
+S''
+sI189
+S'        self.menu = []             # used by the default view layout'
+p114
+sI190
+S'        self.files = []            # used by web2py_ajax.html'
+p115
+sI191
+S'        self.generic_patterns = []  # patterns to allow generic views'
+p116
+ssg83
+S'(f=<function instrument_form>)'
+p117
+sg85
+S'<lambda>'
+p118
+sa(dp119
+g62
+S'/home/lavya/web2py/applications/volt/controllers/default.py'
+p120
+sg64
+(dp121
+S'instrument_id'
+p122
+S'1'
+sS'db.instrument.id'
+p123
+S'<gluon.dal.Field object>'
+p124
+sS').select'
+p125
+g105
+sS'global db'
+p126
+S'<DAL uri="sqlite://storage.db">'
+p127
+sS'query'
+p128
+g105
+sS'db.instrument'
+p129
+S'<Table instrument (id,method1,method2,method3)>'
+p130
+ssg70
+I1554
+sg71
+(dp131
+I1547
+S''
+sI1548
+S'    if updateform.process().accepted:'
+p132
+sI1549
+S"        response.flash = 'updated'"
+p133
+sI1550
+S'    return locals()'
+p134
+sI1551
+S''
+sI1552
+S'def instrument_form():'
+p135
+sI1553
+S'    instrument_id = 1'
+p136
+sI1554
+S'    query = db().select(db.instrument.id == instrument_id)'
+p137
+sI1555
+S"    form = SQLFORM.factory(Field('sampletest',default=query[1]))"
+p138
+sI1556
+S'    return dict(form=form)'
+p139
+ssg83
+S'()'
+p140
+sg85
+S'instrument_form'
+p141
+sa(dp142
+g62
+S'/home/lavya/web2py/gluon/dal.py'
+p143
+sg64
+(dp144
+S'self.query'
+p145
+S'None'
+p146
+sS'adapter.select'
+p147
+S'<bound method SQLiteAdapter.select of <gluon.dal.SQLiteAdapter object>>'
+p148
+sS'fields'
+p149
+S'[<Query (instrument.id = 1)>]'
+p150
+sS'adapter'
+p151
+S'<gluon.dal.SQLiteAdapter object>'
+p152
+sS'attributes'
+p153
+g45
+sS'self'
+p154
+S'<Set None>'
+p155
+ssg70
+I9958
+sg71
+(dp156
+I9953
+S"                                    attributes.get('join',None),"
+p157
+sI9954
+S"                                    attributes.get('left',None),"
+p158
+sI9955
+S"                                    attributes.get('orderby',None),"
+p159
+sI9956
+S"                                    attributes.get('groupby',None))"
+p160
+sI9957
+S'        fields = adapter.expand_all(fields, tablenames)'
+p161
+sI9958
+S'        return adapter.select(self.query,fields,attributes)'
+p162
+sI9959
+S''
+sI9960
+S'    def nested_select(self,*fields,**attributes):'
+p163
+sI9961
+S'        return Expression(self.db,self._select(*fields,**attributes))'
+p164
+sI9962
+S''
+ssg83
+S'(self=<Set None>, *fields=[<Query (instrument.id = 1)>], **attributes={})'
+p165
+sg85
+S'select'
+p166
+sa(dp167
+g62
+S'/home/lavya/web2py/gluon/dal.py'
+p168
+sg64
+(dp169
+S'fields'
+p170
+S'[<Query (instrument.id = 1)>]'
+p171
+sS'self'
+p172
+S'<gluon.dal.SQLiteAdapter object>'
+p173
+sS').select'
+p174
+S'<bound method SQLiteAdapter.select of <gluon.dal.SQLiteAdapter object>>'
+p175
+sS'attributes'
+p176
+g45
+sS'global SQLiteAdapter'
+p177
+S"<class 'gluon.dal.SQLiteAdapter'>"
+p178
+sS'query'
+p179
+S'None'
+p180
+sS'builtinsuper'
+p181
+S"<type 'super'>"
+p182
+ssg70
+I2245
+sg71
+(dp183
+I2240
+S'        Note that the entire database, rather than one record, is locked'
+p184
+sI2241
+S'        (it will be locked eventually anyway by the following UPDATE).'
+p185
+sI2242
+S'        """'
+p186
+sI2243
+S"        if attributes.get('for_update', False) and not 'cache' in attributes:"
+p187
+sI2244
+S"            self.execute('BEGIN IMMEDIATE TRANSACTION;')"
+p188
+sI2245
+S'        return super(SQLiteAdapter, self).select(query, fields, attributes)'
+p189
+sI2246
+S''
+sI2247
+S'class SpatiaLiteAdapter(SQLiteAdapter):'
+p190
+sI2248
+S"    drivers = ('sqlite3','sqlite2')"
+p191
+sI2249
+S''
+ssg83
+S'(self=<gluon.dal.SQLiteAdapter object>, query=None, fields=[<Query (instrument.id = 1)>], attributes={})'
+p192
+sg85
+g166
+sa(dp193
+g62
+S'/home/lavya/web2py/gluon/dal.py'
+p194
+sg64
+(dp195
+S'self._select'
+p196
+S'<bound method SQLiteAdapter._select of <gluon.dal.SQLiteAdapter object>>'
+p197
+sS'fields'
+p198
+S'[<Query (instrument.id = 1)>]'
+p199
+sS'self'
+p200
+S'<gluon.dal.SQLiteAdapter object>'
+p201
+sS'sql'
+p202
+g105
+sS'query'
+p203
+S'None'
+p204
+sS'attributes'
+p205
+g45
+ssg70
+I1691
+sg71
+(dp206
+I1686
+S''
+sI1687
+S'    def select(self, query, fields, attributes):'
+p207
+sI1688
+S'        """'
+p208
+sI1689
+S'        Always returns a Rows object, possibly empty.'
+p209
+sI1690
+S'        """'
+p210
+sI1691
+S'        sql = self._select(query, fields, attributes)'
+p211
+sI1692
+S"        cache = attributes.get('cache', None)"
+p212
+sI1693
+S"        if cache and attributes.get('cacheable',False):"
+p213
+sI1694
+S"            del attributes['cache']"
+p214
+sI1695
+S'            (cache_model, time_expire) = cache'
+p215
+ssg83
+S'(self=<gluon.dal.SQLiteAdapter object>, query=None, fields=[<Query (instrument.id = 1)>], attributes={})'
+p216
+sg85
+g166
+sa(dp217
+g62
+S'/home/lavya/web2py/gluon/dal.py'
+p218
+sg64
+(dp219
+S'fields'
+p220
+S'[<Query (instrument.id = 1)>]'
+p221
+sS'sql_f'
+p222
+g105
+sS'geoexpand'
+p223
+S'<function geoexpand>'
+p224
+sS'builtinmap'
+p225
+S'<built-in function map>'
+p226
+ssg70
+I1543
+sg71
+(dp227
+I1538
+S'        self._colnames = map(self.expand, fields)'
+p228
+sI1539
+S'        def geoexpand(field):'
+p229
+sI1540
+S"            if isinstance(field.type,str) and field.type.startswith('geometry'):"
+p230
+sI1541
+S'                field = field.st_astext()'
+p231
+sI1542
+S'            return self.expand(field)'
+p232
+sI1543
+S"        sql_f = ', '.join(map(geoexpand, fields))"
+p233
+sI1544
+S"        sql_o = ''"
+p234
+sI1545
+S"        sql_s = ''"
+p235
+sI1546
+S"        left = args_get('left', False)"
+p236
+sI1547
+S"        inner_join = args_get('join', False)"
+p237
+ssg83
+S'(self=<gluon.dal.SQLiteAdapter object>, query=None, fields=[<Query (instrument.id = 1)>], attributes={})'
+p238
+sg85
+S'_select'
+p239
+sa(dp240
+g62
+S'/home/lavya/web2py/gluon/dal.py'
+p241
+sg64
+(dp242
+S'field.type'
+p243
+g105
+sS'builtinisinstance'
+p244
+S'<built-in function isinstance>'
+p245
+sS'builtinstr'
+p246
+S"<type 'str'>"
+p247
+sS'field'
+p248
+S'<Query (instrument.id = 1)>'
+p249
+ssg70
+I1540
+sg71
+(dp250
+I1536
+S'        if len(tablenames) < 1:'
+p251
+sI1537
+S"            raise SyntaxError('Set: no tables selected')"
+p252
+sI1538
+S'        self._colnames = map(self.expand, fields)'
+p253
+sI1539
+S'        def geoexpand(field):'
+p254
+sI1540
+S"            if isinstance(field.type,str) and field.type.startswith('geometry'):"
+p255
+sI1541
+S'                field = field.st_astext()'
+p256
+sI1542
+S'            return self.expand(field)'
+p257
+sI1543
+S"        sql_f = ', '.join(map(geoexpand, fields))"
+p258
+sI1544
+S"        sql_o = ''"
+p259
+sI1535
+S''
+ssg83
+S'(field=<Query (instrument.id = 1)>)'
+p260
+sg85
+S'geoexpand'
+p261
+sasS'pyver'
+p262
+S'Python 2.7.3: /usr/bin/python (prefix: /usr)'
+p263
+sS'session'
+p264
+g57
+(S's\x1b\x01\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">last_orderby</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">last_query</td><td valign="top">:</td><td><div>db.instrument.id&gt;0</div></td></tr></table></div>'
+tRp265
+sS'etype'
+p266
+S"<type 'exceptions.AttributeError'>"
+p267
+sS'date'
+p268
+S'Fri Aug  2 21:07:37 2013'
+p269
+sS'response'
+p270
+g57
+(S's\x1e\x1c\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0xb2443640&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">session_id_volt</td><td valign="top">:</td><td><div>127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div>/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">delimiters</td><td valign="top">:</td><td><div><table><tr><td><div>{{</div></td></tr><tr><td><div>}}</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">files</td><td valign="top">:</td><td><div><table><tr><td><div>/volt/static/plugin_wiki/ui/css/redmond/jquery-ui-1.8.5.custom.css</div></td></tr><tr><td><div>/volt/static/plugin_wiki/ui/js/jquery-ui-1.8.5.custom.min.js</div></td></tr><tr><td><div>/volt/static/plugin_wiki/jqgrid/ui.jqgrid.css</div></td></tr><tr><td><div>/volt/static/plugin_wiki/jqgrid/i18n/grid.locale-en.js</div></td></tr><tr><td><div>/volt/static/plugin_wiki/jqgrid/jquery.jqGrid.min.js</div></td></tr><tr><td><div>/volt/static/plugin_wiki/slideshow/jquery.cycle.min.js</div></td></tr><tr><td><div>/volt/static/plugin_wiki/multiselect/jquery.multiselect.css</div></td></tr><tr><td><div>/volt/static/plugin_wiki/multiselect/jquery.multiselect.js</div></td></tr><tr><td><div>/volt/static/plugin_wiki/rating/jquery.rating.css</div></td></tr><tr><td><div>/volt/static/plugin_wiki/rating/jquery.rating.js</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">flash</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">generic_patterns</td><td valign="top">:</td><td><div><table><tr><td><div>*</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">google_analytics_id</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">headers</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">X-Powered-By</td><td valign="top">:</td><td><div>web2py</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">menu</td><td valign="top">:</td><td><div><table><tr><td><div><table><tr><td><div>Home</div></td></tr><tr><td><div>False</div></td></tr><tr><td><div>/volt/default/list_all_projects</div></td></tr><tr><td><div><table></table></div></td></tr></table></div></td></tr><tr><td><div><table><tr><td><div>Projects</div></td></tr><tr><td><div>False</div></td></tr><tr><td><div>/volt/default/list_all_projects</div></td></tr><tr><td><div><table></table></div></td></tr></table></div></td></tr><tr><td><div><table><tr><td><div>Tasks</div></td></tr><tr><td><div>False</div></td></tr><tr><td><div>/volt/default/mytasks</div></td></tr><tr><td><div><table></table></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">meta</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">author</td><td valign="top">:</td><td><div>Vikram Pudi &lt;vikram@iiit.ac.in&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">copyright</td><td valign="top">:</td><td><div>Copyright 2011</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">description</td><td valign="top">:</td><td><div>Computational Core for Plant Metabolomics -- A project sanctioned by DBT, Govt. of India</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">generator</td><td valign="top">:</td><td><div>Web2py Web Framework</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">keywords</td><td valign="top">:</td><td><div>web2py, python, metabolome, metabolomics</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">models_to_run</td><td valign="top">:</td><td><div><table><tr><td><div>^\\w+\\.py$</div></td></tr><tr><td><div>^default/\\w+\\.py$</div></td></tr><tr><td><div>^default/instrument_form/\\w+\\.py$</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">postprocessing</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_cookie_expires</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_data_name</td><td valign="top">:</td><td><div>session_data_volt</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_file</td><td valign="top">:</td><td><div>&lt;open file &#x27;/home/lavya/web2py/applications/volt/sessions/127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c&#x27;, mode &#x27;rb+&#x27; at 0xadc10860&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_filename</td><td valign="top">:</td><td><div>/home/lavya/web2py/applications/volt/sessions/127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id</td><td valign="top">:</td><td><div>127.0.0.1-902867e0-4dd4-40c8-b085-d07eea867f2c</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_name</td><td valign="top">:</td><td><div>session_id_volt</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_locked</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_new</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_storage_type</td><td valign="top">:</td><td><div>file</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">status</td><td valign="top">:</td><td><div>200</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">subtitle</td><td valign="top">:</td><td><div>Computational Core for Plant Metabolomics</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">title</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">view</td><td valign="top">:</td><td><div>default/instrument_form.html</div></td></tr></table></div>'
+tRp271
+sS'locals'
+p272
+(dp273
+S'field'
+p274
+S'<Query (instrument.id = 1)>'
+p275
+sS'self'
+p276
+S'<gluon.dal.SQLiteAdapter object>'
+p277
+sssS'traceback'
+p278
+S'Traceback (most recent call last):\n  File "/home/lavya/web2py/gluon/restricted.py", line 212, in restricted\n    exec ccode in environment\n  File "/home/lavya/web2py/applications/volt/controllers/default.py", line 1558, in <module>\n  File "/home/lavya/web2py/gluon/globals.py", line 194, in <lambda>\n    self._caller = lambda f: f()\n  File "/home/lavya/web2py/applications/volt/controllers/default.py", line 1554, in instrument_form\n    query = db().select(db.instrument.id == instrument_id)\n  File "/home/lavya/web2py/gluon/dal.py", line 9958, in select\n    return adapter.select(self.query,fields,attributes)\n  File "/home/lavya/web2py/gluon/dal.py", line 2245, in select\n    return super(SQLiteAdapter, self).select(query, fields, attributes)\n  File "/home/lavya/web2py/gluon/dal.py", line 1691, in select\n    sql = self._select(query, fields, attributes)\n  File "/home/lavya/web2py/gluon/dal.py", line 1543, in _select\n    sql_f = \', \'.join(map(geoexpand, fields))\n  File "/home/lavya/web2py/gluon/dal.py", line 1540, in geoexpand\n    if isinstance(field.type,str) and field.type.startswith(\'geometry\'):\nAttributeError: \'Query\' object has no attribute \'type\'\n'
+p279
+s.

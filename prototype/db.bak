@@ -1,0 +1,502 @@
+#s scaffolding model makes your app work on Google App Engine too
+## File is released under public domain and you can use without limitations
+#########################################################################
+
+## if SSL/HTTPS is properly configured and you want all HTTP requests to
+## be redirected to HTTPS, uncomment the line below:
+# request.requires_https()
+
+if not request.env.web2py_runtime_gae:
+    ## if NOT running on Google App Engine use SQLite or other DB
+    db = DAL('sqlite://storage.sqlite')
+else:
+    ## connect to Google BigTable (optional 'google:datastore://namespace')
+    db = DAL('google:datastore')
+    ## store sessions and tickets there
+    session.connect(request, response, db = db)
+    ## or store session in Memcache, Redis, etc.
+    ## from gluon.contrib.memdb import MEMDB
+    ## from google.appengine.api.memcache import Client
+    ## session.connect(request, response, db = MEMDB(Client()))
+
+## by default give a view/generic.extension to all actions from localhost
+## none otherwise. a pattern can be 'controller/function.extension'
+response.generic_patterns = ['*'] if request.is_local else []
+## (optional) optimize handling of static files
+# response.optimize_css = 'concat,minify,inline'
+# response.optimize_js = 'concat,minify,inline'
+
+#########################################################################
+## Here is sample code if you need for
+## - email capabilities
+## - authentication (registration, login, logout, ... )
+## - authorization (role based authorization)
+## - services (xml, csv, json, xmlrpc, jsonrpc, amf, rss)
+## - old style crud actions
+## (more options discussed in gluon/tools.py)
+#########################################################################
+
+from gluon.tools import Auth, Crud, Service, PluginManager, prettydate
+auth = Auth(db, hmac_key=Auth.get_or_create_key())
+crud, service, plugins = Crud(db), Service(), PluginManager()
+
+## create all tables needed by auth if not custom tables
+
+db.define_table('affiliation',
+		Field('name','string',required=True,requires=IS_NOT_EMPTY()),
+		Field('description','text',required=True),format='%(name)s')
+
+
+auth.settings.extra_fields['auth_user'] = [
+     Field('title',notnull=True,required=True,requires=IS_IN_SET({'0':'Mr','1':'Mrs','2':'Ms','3':'Prof','4':'Dr'}),label = 'Salutation'),
+     Field('position',notnull=False,label='Positon',required=True,requires=IS_IN_SET({'0':'Post Doctoral Fellow','1':'Faculty/Scientist','2':'Post Graduate/Phd student','3':'Under Graduate'})),
+#     Field('middle',notnull=False,required=False,label='Middle Name'),
+     Field('affiliated_to',requires=IS_NOT_EMPTY(),label = 'Affiliation'),
+     Field('address','text', label='Postal Address',required=True,requires = IS_NOT_EMPTY()),
+     Field('city',notnull=False,required=True,requires=IS_NOT_EMPTY(),label = 'City'),
+     Field('country',notnull=True,required=True,requires=IS_NOT_EMPTY(),default = 'India',label = 'Country'),
+     Field('postal_code',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Postal Code'),
+     Field('phone',label = 'Telephone Number'),
+     Field('mobile',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Mobile Number'),
+     Field('registration_at',notnull=False,required=False,requires=IS_IN_SET({'0':'IIIT Hyderabad','1':'JNU Delhi'}),label ='Registration at',comment='centre you wish to attend for the workshop')
+]
+	
+#auth.define_tables(username=True)
+auth.define_tables()
+
+## configure email
+mail=auth.settings.mailer
+mail.settings.server = ''
+mail.settings.sender = ''
+#mail.settings.login = 'username:password'
+
+## configure auth policy
+auth.settings.registration_requires_verification = False
+auth.settings.registration_requires_approval = False
+auth.settings.reset_password_requires_verification = True
+
+auth.messages.verify_email = 'Click on the link http://metabolomics.iiit.ac.in/DEV_bootstrap/default/user/verify_email'+'/%(key)s to verify your email'
+
+## if you need to use OpenID, Facebook, MySpace, Twitter, Linkedin, etc.
+## register with janrain.com, write your domain:api_key in private/janrain.key
+from gluon.contrib.login_methods.rpx_account import use_janrain
+use_janrain(auth,filename='private/janrain.key')
+
+#########################################################################
+## Define your tables below (or better in another model file) for example
+##
+## >>> db.define_table('mytable',Field('myfield','string'))
+##
+## Fields can be 'string','text','password','integer','double','boolean'
+##       'date','time','datetime','blob','upload', 'reference TABLENAME'
+## There is an implicit 'id integer autoincrement' field
+## Consult manual for more options, validators, etc.
+##
+## More API examples for controllers:
+##
+## >>> db.mytable.insert(myfield='value')
+## >>> rows=db(db.mytable.myfield=='value').select(db.mytable.ALL)
+## >>> for row in rows: print row.id, row.myfield
+#########################################################################
+import datetime
+now = datetime.datetime.now()
+today_date = datetime.datetime.today() 
+
+role_list = ['investigator','co_investigator','collaborator','analyst','experimentalist','member','project_coordinator']
+
+T.force('en-de')
+
+db.define_table('project',
+     Field('name',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.name'),label='Project Name'),
+     Field('code',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.code'),label='Project Code'),
+     Field('start_date','date',default=today_date,notnull=True,required=True,requires=IS_DATE()),
+     Field('project_coordinator','reference auth_user'),
+     Field('project_description','text',label='Brief Description of Experiment/Project'),
+     #Field('project_description_upload','upload',label='Or upload'),
+     Field('project_status',notnull=True,default='0',requires=IS_IN_SET({'0':'Development','1':'Published'})),
+     Field('project_literature_reference','string',label='Literature Reference(Any support published Document'),
+     Field('project_journal_name','string',label='Name of Journal'),
+     Field('project_publication_date','date'),
+     Field('project_pubmed_id','string',label='PubMed ID'),
+     format='%(name)s')
+
+
+db.define_table('role',
+     Field('user','reference auth_user'),
+     Field('project','reference project'), 
+     Field('role',notnull=True,required=True,requires=IS_IN_SET({'0':'Investigator','1':'Co-Investigator','2':'Collaborator','4':'Experimentalist'})),
+     Field('approval_status',notnull=True,requires=IS_IN_SET({'0':'Pending','1':'Approved','2':'Blocked'})),
+     Field('member_since',readable=False,writable=False,notnull=True,required=True,default=request.now))
+
+
+#the user and code and required time should be not null , required ..  
+#added project field to sync with db.insert in controller
+db.define_table('sample',
+    Field('experimentalist','reference auth_user',writable=False),
+   # Field('analyst','reference auth_user'),
+    Field('name',unique=True,notnull=True,required=True,label='Sample Name'),
+    Field('code',required=True,requires=IS_NOT_IN_DB(db,'sample.code'),label='Sample Code'),
+    Field('description','text',length=2000,label='Sample Description'),
+   # Field('project','reference project'),
+    Field('scientific_name','string'),
+    Field('experiment','reference experiment',writable=False),
+    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),
+    Field('replica',default='root',required=True,requires=IS_IN_SET(['root','replicate','alicot']),label='Type'),
+    Field('publication_status','boolean',default=False,required=True,label='Published'),format='%(name)s')
+
+
+db.define_table('template',
+    Field('user',unique=True,),
+    Field('sample','reference sample'))
+
+db.define_table('experiment',
+    Field('experimentalist','reference auth_user'),
+   # Field('analyst','reference auth_user'),
+    Field('name',unique=True,notnull=True,required=True,label='Experiemnt Name'),
+    Field('code',required=True,requires=IS_NOT_IN_DB(db,'experiment.code'),label='Experiment Code'),
+    Field('description','text',length=2000,notnull=True,required=True,label='experiment Description'),
+    Field('project','reference project',writable=False),
+    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),
+    Field('publication_status','boolean',default=False,required=True,label='Published'),format='%(name)s')
+
+db.define_table('project_meta',
+   Field('project','reference project'),
+   Field('enitity','reference entity'))
+
+#bio tables
+
+#schema changes - plant_type (Inbred,Hybrid,Complete) is added 
+
+# 2.1 
+db.define_table('biosource',
+    Field('sample_name','reference sample',writable = False),
+    Field('species_name','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('genotype_echotype','string',label='Echotype/Background',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('genotype_pedigree_information','string',label='Pedigree Information',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('genotype_plant_type','string',label='Plant Type',required=True,notnull=True,requires=IS_IN_SET({'Transgenic Type','Mutant Type','Wild Type'})),
+    Field('plant_type','string',requires=IS_IN_SET({'0':'Inbred','1':'Hybrid','2':'Composite'})),
+    Field('genotype_gene_names','string',label='Gene Name(s)',required=True,notnull=True),
+#Field('geno_gene_name',)
+    
+    Field('organ' ,'string',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('organ_spec','string',label='Organ Specification',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('cell_type','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('sub_cell_location','string',label='Sub Cellular Location',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('bio_source_amount','string',label='BioSource Amount',required=True,notnull=True,requires=IS_NOT_EMPTY()),singular = 'Biosource',plural = 'Biosource')
+
+
+
+#schema changes - date est other has been changed from date to text and the label has been changed
+
+db.define_table('plant_growth_condition',
+    Field('sample_name','reference sample', writable = False),
+    Field('growth_soil','text',label='Soil (type, supplier)',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('growth_agar','text',label='Agar (type, supplier)',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('growth_vermiculite','text',label='Vermiculite (type, supplier)',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('growth_hydroponic','text',label='Hydroponic system (type,supplier,nutrient concentrations)',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('growth_cell_culture','text',label='Cell culture (media, volume,cell number per volume)',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('loc_field_location','string',label='Location',required=True,notnull=True,requires=IS_NOT_EMPTY()),	
+    Field('loc_field_avr_humidity','string',label='Average Humidity',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('loc_field_avr_temp','string',label='Average Temperature',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('loc_field_avr_rain','string',label='Average Rain Fall',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('Climate_chamber_size','string',label='Climate chamber size (m3)',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('loc_green_location','string',label='Location',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('loc_green_light','string',label='Light (quality,source mode/type,intensity, luminescence period(hr.),dark period (hr.))',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('loc_green_humidity','string',label='Humidity (day,night)',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('loc_green_temperature','string',label='Temperature (day,night)',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('loc_green_water','string',label='Water Regime (Amount, time per day) ',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('Growth_Protocol_Description','text',label='Growth Protocol Description'),	
+    Field('growth_protocol_description_upload','upload',label='or'),	
+    Field('Growth_Plot_Design','text',label='Growth Plot Design',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('nutr_amount','string',label='Nutrient Amount',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('nutr_duration','string',label='Duration',required=True,notnull=True,requires=IS_NOT_EMPTY()),		
+    Field('nutr_add_info','text',label='Additional information',required=True,notnull=True,requires=IS_NOT_EMPTY()),
+    Field('date_est_sowing','date',label='Date of Sowing',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!',))),		
+    Field('date_est_germinating','date',label='Date of Germination',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!'))),
+    Field('date_est_transplanting','date',label='Date of Transplanting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!'))),
+    Field('date_est_cutting','date',label='Date of cutting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!'))),		
+    Field('date_est_grafting','date',label='Date of Grafting ',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!'))),	
+    Field('date_est_other','text',label='Additional Information (Stages etc)',required=False),	
+    Field('other_spec','text',label='Other Specific Metadata'),	
+    Field('other_spec_upload','upload',label='or'),singular = 'Plant Growth Condition',plural = 'Growth'
+    ) 
+
+
+db.define_table('treatments',
+    Field('sample_name','reference sample', writable = False),
+    Field('treament_biotic_factor','text',length=4000,label='Biotic'),
+    Field('treatment_abiotic_factor','text',length=4000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Abiotic'),
+    Field('treatment_intervention','text',notnull=True,required=True,label='Intervention'),
+    Field('treatment_dose','string',notnull=True,required=True,label='Treatment Dose/Intensity levels'),
+    Field('treatment_start_date','date',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!'))),
+    Field('treatment_time_duration','string',label='Treament Time(Duration)'),
+    Field('treatment_time','string'),
+    Field('treatment_time_interval','string'),
+    Field('treatment_description','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('treatment_before_harvest','string',notnull=True,required=True,label='Treatment duration before harvest'),singular = 'Treatments',plural = 'Treatments')
+#2.4
+#schema changes - additional comments field is added for harvest amount 
+
+db.define_table('harvests',
+    Field('sample_name','reference sample', writable = False),
+    Field('harvest_date','date',notnull=True,required=True,label='Harvest Date(YYYY-MM-DD)',requires=IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!')),
+    Field('harvest_time','time',notnull=True,required=True,label='Harvest Time(HH:MM:SS)',requires=IS_TIME()),
+    Field('plant_growth_stage','string',notnull=True,required=True,label='plant growth stage/developmental stage'),
+    Field('metalbolism_quenching_method','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('harvest_method','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('harvest_amount','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Harvest Amount(in grams)'),
+    Field('harvest_amount_comment','text'),
+    Field('sample_storage_description','text',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Storage Description'),
+    Field('sample_storage_date','date',notnull=True,required=True,label='Storage Date',requires=IS_DATE(format=T('%Y-%m-%d'),error_message='must be YYYY-MM-DD!')),
+    Field('sample_storage_location','string',notnull=True,required=True,label='Storage location'),
+    Field('sample_storage_temparature','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Storage Temperature'),singular= 'Harvest',plural='Harvests')
+
+
+#seperate table for 2.6 to 2.7 since they are multivalued attributes for a sample
+
+
+db.define_table('extraction_preparation',
+		Field('sample_name','reference sample', writable = False),
+		Field('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),
+		Field('sample_extraction_date','date',notnull=True,required=True,requires=IS_DATE(),label='Date of sample Extraction'),
+		Field('sample_extraction_desc','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Processing and Extraction'),
+		Field('extraction_solvent','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+		Field('extraction_protocol','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+		Field('extraction_volume','double',notnull=True,required=True,label='Extraction Volume (ml)',requires=IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!')),
+		Field('resuspension_process','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Concentration and Resuspension Process'),
+		Field('extract_cleanup','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Clean-Up'),
+                Field('storage_description','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+		Field('storage_location','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+		Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+		Field('storage_temparature','double',notnull=True,required=True,requires=IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius'),label='Storage Temparature (in Celsius)'),
+		Field('preparation_protocol','text',length=8000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Preparation Protocol Description'),
+                Field('preparation_date','date',notnull=True,required=True,requires=IS_DATE()),
+		Field('storage_condition','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+		Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+		Field('sample_extraction_times','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,6)),singular='Extr Preparation',plural='Extr Preparation')
+
+
+
+#3.1.1 GC
+db.define_table('gas_chromatography',
+    Field('sample_name','reference sample', writable = False),
+    Field('sample_extraction_date','date',notnull=True,required=True,requires=IS_DATE(),label='Date of sample Extraction'),
+    Field('sample_extraction_desc','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Processing and Extraction'),
+    Field('extraction_solvent','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('extraction_protocol','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('extraction_volume','double',notnull=True,required=True,label='Extraction Volume (ml)',requires=IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!')),
+    Field('resuspension_process','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Concentration and Resuspension Process'),
+    Field('extract_cleanup','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Clean-Up'),
+    Field('storage_description','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_location','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('storage_temparature','double',notnull=True,required=True,requires=IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius'),label='Storage Temparature (in Celsius)'),
+    Field('preparation_protocol','text',length=8000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Preparation Protocol Description'),
+    Field('preparation_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('storage_condition','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('sample_extraction_times','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,6)),
+    Field('instrument_manufacturer','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Manufacturer'),
+    Field('instrument_model_name','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Model name/number'),
+    Field('instrument_software_package','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Software package'),
+    Field('instrument_version_number_or_date','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Version number or Date'),
+#3.1.2 GC
+    Field('derivatization_method','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Method'),
+    Field('reagents_used_for_derivation','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Reagents used for Derivatization'),
+    Field('derivatization_temperature','double',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Derivatization temperature (in degree centigrade)'),
+    Field('derivatization_duration','double',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Duration(in min)'),
+#3.1.3
+    Field('injector_model','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Injector model/type'),
+    Field('injector_software_version','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Software version'),
+    Field('method_name','text',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Method name (used for sample injection)'),
+    Field('injection_volume','string',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('wash_cycles','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Wash cycles(volumes)'),
+    Field('solvent','string',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('sample_size',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Sample size/concentration'),
+#3.1.41
+    Field('column_manufacturer','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Manufacturer'),
+    Field('product_name_and_catalogue_number_of_column','string',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Product Name and catalogue number (year of catalogue)'),
+    Field('stationary_media_composition','string',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('internal_diameter_of_column','string',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('length_of_column','text',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('column_temperature_program','text',notnull=False,required=False,requires=IS_NOT_EMPTY()),
+    Field('column_head_pressure','double',notnull=False,required=False,requires=IS_NOT_EMPTY(),label='Column head pressure(in psi)'),
+    Field('flow_rate','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Flow rate(in mL/min)'),
+#3.1.5
+    Field('seperation_method_name','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Method name'),
+    Field('injector_temperature','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Injector tempreature(in degree*c)'),
+    Field('split_splitless_mode','string',notnull=True,required=True,requires=IS_IN_SET({'0':'Split mode','1':'Splitless mode'}),label='Split or splitless mode'),
+    Field('split_ratio','text'),
+    Field('mobile_phase_composition','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('mobile_phase_flow_rate','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Mobile phase flow rate(in ml/min)'),
+    Field('thermal_gradient_profiles','text',length='1000',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+
+#3.1.6
+    Field('validation_sample','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('internal_standards','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('chromatographic_resolution','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_column','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_injector','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_septum','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_blank','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+#3.1.7
+    Field('SOP_protocol_name','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('date_of_analysis','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('operator','reference auth_user',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('deviation_from_SOP','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('publication_refernce','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Publication reference(If any)'),plural='GC')
+
+#LC
+db.define_table('liquid_chromatography',
+    Field('sample_name','reference sample', writable = False),
+    Field('sample_extraction_date','date',notnull=True,required=True,requires=IS_DATE(),label='Date of sample Extraction'),
+    Field('sample_extraction_desc','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Processing and Extraction'),
+    Field('extraction_solvent','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('extraction_protocol','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('extraction_volume','double',notnull=True,required=True,label='Extraction Volume (ml)',requires=IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!')),
+    Field('resuspension_process','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Concentration and Resuspension Process'),
+    Field('extract_cleanup','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Extract Clean-Up'),
+    Field('storage_description','text',length=5000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_location','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('storage_temparature','double',notnull=True,required=True,requires=IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius'),label='Storage Temparature (in Celsius)'),
+    Field('preparation_protocol','text',length=8000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample Preparation Protocol Description'),
+    Field('preparation_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('storage_condition','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('storage_date','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('sample_extraction_times','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,6)),
+    Field('instrument_manufacturer','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Manufacturer'),
+    Field('instrument_model_name_ornumber','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Model name/number'),
+    Field('instrument_software_package','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Software package'),
+    Field('instrument_version_number_or_date','string',notnull=True,required=True,label='Version number or Date'),
+#3.1.3
+    Field('injector_model','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Injector model/type'),
+    Field('injector_software_version','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Software version'),
+    Field('method_name','text',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Method name (used for sample injection)'),
+    Field('injection_volume','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('wash_cycles','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Wash cycles(volumes)'),
+    Field('solvent','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('sample_size_or_concentration',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Sample size/concentration'),
+#3.1.41
+    Field('column_manufacturer','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Manufacturer'),
+    Field('product_name_and_catalogue_number_of_column','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Product Name and catalogue number (year of catalogue)'),
+    Field('stationary_media_composition','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('internal_diameter_of_column','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('length_of_column','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('column_temperature_program','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('column_head_pressure','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Column head pressure(in psi)'),
+    Field('flow_rate','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Flow rate(in mL/min)'),
+#3.1.5
+    Field('seperation_method_name','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Method name'),
+    Field('injector_temperature','string',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Injector tempreature(in degree*c)'),
+    Field('split_splitless_mode','string',notnull=True,required=True,requires=IS_IN_SET(['Split mode','Splitless mode']),label='Split or splitless mode'),
+    Field('split_ratio','text'),
+    Field('mobile_phase_composition','text',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('mobile_phase_flow_rate','double',notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Mobile phase flow rate(in ml/min)'),
+    Field('solvent_gradient_profiles','text',length='1000',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+#3.1.6
+    Field('validation_sample','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('internal_standards','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('chromatographic_resolution','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_column','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_injector','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_septum','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('cycle_per_blank','integer',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+#3.1.7
+    Field('SOP_protocol_name','string',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('date_of_analysis','date',notnull=True,required=True,requires=IS_DATE()),
+    Field('operator','reference auth_user',notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('deviation_from_SOP','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY()),
+    Field('publication_refernce','text',length=1000,notnull=True,required=True,requires=IS_NOT_EMPTY(),label='Publication reference'),plural='LC')
+
+# main table for  3.2 
+db.define_table('mass_spectroscopy',
+
+# table 3.2.1
+     Field('sample_name','reference sample', writable = False),
+     Field('manufacturer','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),    
+     Field('model','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),    
+     Field('oper_soft_name','string',label='operational software name ',required=True,notnull=True,requires=IS_NOT_EMPTY()),    
+     Field('oper_soft_ver','string',label='operational software version',required=True,notnull=True,requires=IS_NOT_EMPTY()),   
+
+# table 3.2.2
+     Field('ionization_mode','string',required=False,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('polarity','string',required=False,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('vaccum_pressure','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('len_voltages','string',label=' skimmer/focusing lens voltages ',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('gas_flows','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('sour_temp','string',label='source temperature',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+
+      
+# table 3.2.3
+     Field('type_of_analyzer','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('m_range','string',label='m/z_range',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('calibration_date','date',required=True,notnull=False,requires=IS_DATE()),    
+     Field('resolution1','string',label='resolution',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('mass_accuracy1','string',label='mass accuracy',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('log_program','string',label='logic program for data acquistion',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('spectral_acquisition_rate','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('vaccum_pressure','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('concentration','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('lock_mass','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('flow_rate','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('frequency','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),    
+     Field('add_info','text',label='additional information ',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+
+
+# table 3.2.4
+     Field('tune','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('sensitivity','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('mass_accuracy2','string',label='mass accuracy',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('resolution2','string',label='resolution',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+
+      
+# table 3.2.5
+     Field('SOP_protocol','text',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('date_of_data_acquistion','date',required=False,notnull=True,requires=IS_DATE()),
+     Field('operator','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('data_acquisition_rate','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+     Field('deviation_from_SOP','string',required=True,notnull=False,requires=IS_NOT_EMPTY()),
+
+     Field('replicate_sample_analysis','integer',required=True,notnull=False,requires=IS_NOT_EMPTY()),plural='MS')
+
+
+db.define_table('spectrophotometry',
+
+# table 3.2.1
+     Field('sample_name','reference sample', writable = False),
+     Field('wavelength','string'),
+     Field('optical_density','string'),
+     Field('Final_concentration_of_compound','string'),plural='SPM')
+     
+
+
+db.define_table('feedback',
+               Field('feedback_on',required=True),
+               Field('feedback_body','text',required=True,requires=IS_NOT_EMPTY()),
+               Field('feedback_by','reference auth_user',notnull=False))                                                              
+db.define_table('raw_data_storage_information',
+    Field('sample_name','reference sample',writable=False),
+    Field('email_id_of_person','string',label='Email id',required=True,requires=IS_EMAIL()),
+    Field('raw_data_file_name','string',label='Raw data file name'),
+    Field('raw_data_file_upload','upload',label='Upload raw data file'),
+    Field('raw_data_standard_format','string',label='Raw data standard format'),
+    Field('raw_data_standard_format_upload','upload',label='Upload converted standard data file'),
+    Field('additional_information_about_data','text',label='Additional information about data'),
+    Field('additional_information_upload','upload',label='Additional data file upload'),
+    Field('date_of_data_upload','date',label='Date of data uploaded',requires=IS_DATE()),plural='Raw Data'
+    )
+
+
+
+db.define_table('sample_files',
+		Field('sample','reference sample',readable=False,writable=False),
+		Field('file','upload',label='Additional Sample Data',required=True,notnull=True),
+		Field('user','reference auth_user',readable=False,writable=False),
+		Field('description','text'),format='%(sample)s')
+
+
+def name(identifier):
+   ans = db(db.auth_user.id == identifier).select().first()
+   f = str(ans.first_name)+' '+str(ans.last_name)
+   return f

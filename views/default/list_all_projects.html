@@ -1,0 +1,55 @@
+{{extend "layout.html"}}
+<style>
+ .heading {
+  font-weight:bold;
+  font-size:20px;
+}
+</style>
+<script>
+ $(document).ready(function() {
+    $('#bpub').click(function() {
+      $('.pub').slideToggle();
+ })
+   $('#bunpub').click(function() {
+      $('.unpub').slideToggle();
+    })
+
+
+  
+ });
+</script>
+<form class="navbar-form pull-right">
+{{=form}}
+<form>
+{{if auth.user:}}
+{{if authenticated=='yes':}}
+<span class="btn"> <i class="icon-plus"></i> {{=(B(A(' Add New Project',_href=URL('add_project'))))}} </span>
+{{pass}}
+{{pass}}
+<br>
+<br>
+<br>
+<span> <span class="heading"> Published Projects </span> <button class="btn btn-primary" type="button" id="bpub"><i class="icon-chevron-down icon-white"></i></button></span>
+
+
+<hr class="pub">
+<ol>
+{{for project in pub_projects:}}
+  {{=LI(B( A(project.project.name,_href=URL('project_viewer',args=project.project.id))),BR(),B("Project Code : "+project.project.code),BR(),(A(" Coordinator: " + project.auth_user.first_name,_href=URL('user_viewer',args=project.project.project_coordinator))),_class='pub')}}
+{{pass}}
+</ol>
+<span>
+<br><br>
+
+
+{{if auth.user:}}
+<span> <span class="heading"> UnPublished Projects </span>  <button class="btn btn-primary" type="button" id="bunpub"><i class="icon-chevron-down icon-white"></i></button></span> 
+<hr class="unpub">
+<ol>
+   {{for project in dev_projects:}}
+      {{=LI(B( A(project.project.name,_href=URL('project_viewer',args=project.project.id))),BR(),B("Project Code : "+project.project.code),BR(),(A(" Coordinator: " + project.auth_user.first_name,_href=URL('user_viewer',args=project.project.project_coordinator))),_class='unpub')}}
+    <br>
+   {{pass}}
+   
+{{pass}}
+</ol>

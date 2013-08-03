@@ -1,0 +1,40 @@
+{{extend 'layout_boot.html'}}
+<style>
+</style>
+<script>
+$(document).ready( function() {
+$('#help').hide();
+$('.w2p_fc').hide();
+var Genbutton = '<i class="icon-exclamation-sign help-hover"></i>';
+
+
+$('.w2p_fc').each( function() {
+ if ($(this).html() != '') {
+   $(this).after(Genbutton);
+}
+});
+
+$('.help-hover').attr('title',function() { k = $(this).siblings('.w2p_fc'); return k.html(); });
+$('.help-hover').tooltip();
+$('#help_button').click(function() {
+$('#help').slideToggle();
+});
+});
+</script>
+
+<h4>BIOSOURCE</h4>
+<div id="help" class="alert alert-success">
+<p> This  is some description of the page . In general, here you can write the tutorial for this page </p>
+<p>This page allows you to add information regarding the bio-source of an particular sample. upon entering the information in this page, you will be asked to enter other aspects of sample like growth conditions, harvest and treatment conditions applied to that particular sample. Field by Field description is given below</p>
+<ol>
+<li>Organ Specification - Name or description of specific part of organ if any used for the study </li>
+<li> Cell Type - Specific plant cells used after dissection or cell sorting or any other method. This naming should be used based on Plant Ontology Consortium (POC). </li>
+<li> Sub Cellular Location - This is about sub cellular locations from cells are collected for experiment. Naming should be maintained based on  Gene Ontology Cellular Component</li>
+<li>BioSource Amount - This is reference to the mass (mg fresh weight or mg dry weight), number of cells or other measurable quantification information </li>
+</ol>
+</div>
+<span><button class="btn btn-primary pull-right" id="help_button" >Help <i class="icon-exclamation-sign icon-white"></i></button></span>
+{{request.args.append('clear')}}
+{{=H5(A('Clear',_href=URL('insert_biosource',args=request.args)))}}
+{{=form}}
+{{pass}}

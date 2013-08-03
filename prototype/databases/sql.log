@@ -1,0 +1,603 @@
+timestamp: 2013-03-11T10:35:52.937806
+CREATE TABLE affiliation(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:53.118820
+CREATE TABLE auth_user(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name CHAR(128),
+    last_name CHAR(128),
+    email CHAR(512),
+    password CHAR(512),
+    registration_key CHAR(512),
+    reset_password_key CHAR(512),
+    registration_id CHAR(512),
+    title CHAR(512) NOT NULL,
+    position CHAR(512),
+    affiliated_to CHAR(512),
+    address TEXT,
+    city CHAR(512),
+    country CHAR(512) NOT NULL DEFAULT 'India',
+    postal_code CHAR(512) NOT NULL,
+    phone CHAR(512),
+    mobile CHAR(512) NOT NULL
+);
+success!
+timestamp: 2013-03-11T10:35:53.228794
+CREATE TABLE auth_group(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:53.364768
+CREATE TABLE auth_membership(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:53.502544
+CREATE TABLE auth_permission(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER REFERENCES auth_group (id) ON DELETE CASCADE,
+    name CHAR(512),
+    table_name CHAR(512),
+    record_id INTEGER
+);
+success!
+timestamp: 2013-03-11T10:35:53.662169
+CREATE TABLE auth_event(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time_stamp TIMESTAMP,
+    client_ip CHAR(512),
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    origin CHAR(512),
+    description TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:53.797058
+CREATE TABLE auth_cas(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    created_on TIMESTAMP,
+    service CHAR(512),
+    ticket CHAR(512),
+    renew CHAR(1)
+);
+success!
+timestamp: 2013-03-11T10:35:53.961779
+CREATE TABLE project(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512) NOT NULL UNIQUE,
+    code CHAR(512) NOT NULL UNIQUE,
+    start_date DATE NOT NULL,
+    project_coordinator INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    project_description TEXT,
+    project_status CHAR(512) NOT NULL DEFAULT '0',
+    project_literature_reference INTEGER,
+    project_journal_name CHAR(512),
+    project_publication_date DATE
+);
+success!
+timestamp: 2013-03-11T10:35:54.104689
+CREATE TABLE role(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    project INTEGER REFERENCES project (id) ON DELETE CASCADE,
+    role CHAR(512) NOT NULL,
+    approval_status CHAR(512) NOT NULL,
+    member_since CHAR(512) NOT NULL
+);
+success!
+timestamp: 2013-03-11T10:35:54.230090
+CREATE TABLE sample(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    experimentalist INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    name CHAR(512) NOT NULL,
+    code CHAR(512),
+    description TEXT,
+    scientific_name CHAR(512),
+    experiment INTEGER REFERENCES experiment (id) ON DELETE CASCADE,
+    working_status CHAR(512),
+    replica CHAR(512),
+    publication_status CHAR(1)
+);
+success!
+timestamp: 2013-03-11T10:35:54.364934
+CREATE TABLE template(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user CHAR(512) UNIQUE,
+    sample INTEGER REFERENCES sample (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:54.503462
+CREATE TABLE experiment(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    experimentalist INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    name CHAR(512) NOT NULL UNIQUE,
+    code CHAR(512),
+    description TEXT NOT NULL,
+    project INTEGER REFERENCES project (id) ON DELETE CASCADE,
+    working_status CHAR(512),
+    publication_status CHAR(1)
+);
+success!
+timestamp: 2013-03-11T10:35:54.649603
+CREATE TABLE project_meta(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project INTEGER REFERENCES project (id) ON DELETE CASCADE,
+    enitity INTEGER REFERENCES entity (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:54.765327
+CREATE TABLE biosource(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    species_name CHAR(512) NOT NULL,
+    genotype_echotype CHAR(512) NOT NULL,
+    genotype_pedigree_information CHAR(512) NOT NULL,
+    genotype_plant_type CHAR(512) NOT NULL,
+    plant_type CHAR(512),
+    Source_of_germplasm CHAR(512) NOT NULL,
+    genotype_gene_names CHAR(512) NOT NULL,
+    organ CHAR(512) NOT NULL,
+    organ_spec CHAR(512) NOT NULL,
+    cell_type CHAR(512) NOT NULL,
+    sub_cell_location CHAR(512) NOT NULL,
+    bio_source_amount CHAR(512) NOT NULL
+);
+success!
+timestamp: 2013-03-11T10:35:54.929882
+CREATE TABLE plant_growth_condition(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    growth_soil CHAR(512),
+    growth_agar CHAR(512),
+    growth_vermiculite CHAR(512),
+    growth_hydroponic CHAR(512),
+    growth_cell_culture CHAR(512),
+    loc_field_location CHAR(512),
+    loc_field_avr_humidity CHAR(512),
+    loc_field_avr_temp CHAR(512),
+    loc_field_avr_rain CHAR(512),
+    Climate_chamber_size CHAR(512),
+    loc_green_location CHAR(512),
+    loc_green_light CHAR(512),
+    loc_green_humidity CHAR(512),
+    loc_green_temperature CHAR(512),
+    loc_green_water CHAR(512),
+    Growth_Protocol_Description TEXT,
+    growth_protocol_description_upload CHAR(512),
+    Growth_Plot_Design TEXT,
+    nutr_amount CHAR(512),
+    nutr_duration CHAR(512),
+    nutr_add_info TEXT,
+    sowing_period CHAR(512),
+    gerrminating_period CHAR(512),
+    date_est_transplanting CHAR(512),
+    date_est_cutting CHAR(512),
+    date_est_grafting CHAR(512),
+    date_est_other CHAR(512),
+    other_spec CHAR(512),
+    other_spec_upload CHAR(512)
+);
+success!
+timestamp: 2013-03-11T10:35:55.059380
+CREATE TABLE treatments(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    treament_biotic_factor CHAR(512),
+    treatment_abiotic_factor CHAR(512),
+    treatment_intervention CHAR(512),
+    treatment_dose CHAR(512),
+    treatment_start_date DATE,
+    treatment_time_duration CHAR(512),
+    treatment_time CHAR(512),
+    treatment_time_interval CHAR(512),
+    treatment_description TEXT,
+    treatment_before_harvest CHAR(512)
+);
+success!
+timestamp: 2013-03-11T10:35:55.207840
+CREATE TABLE harvests(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    harvest_date DATE,
+    harvest_time TIME,
+    plant_growth_stage CHAR(512),
+    metalbolism_quenching_method TEXT,
+    harvest_method TEXT,
+    harvest_amount CHAR(512),
+    harvest_amount_comment TEXT,
+    sample_storage_description TEXT,
+    sample_storage_date DATE,
+    sample_storage_location CHAR(512),
+    sample_storage_temparature CHAR(512)
+);
+success!
+timestamp: 2013-03-11T10:35:55.334089
+CREATE TABLE extraction_preparation(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    sample_id INTEGER NOT NULL,
+    sample_extraction_date DATE,
+    sample_extraction_desc TEXT,
+    extraction_solvent TEXT,
+    extraction_protocol TEXT,
+    extraction_volume DOUBLE,
+    resuspension_process TEXT,
+    extract_cleanup TEXT,
+    storage_description TEXT,
+    storage_location TEXT,
+    storage_date DATE,
+    storage_temparature DOUBLE,
+    preparation_protocol TEXT,
+    preparation_date DATE,
+    storage_condition TEXT,
+    sample_extraction_times INTEGER
+);
+success!
+timestamp: 2013-03-11T10:35:55.468650
+CREATE TABLE gas_chromatography(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    sample_id INTEGER NOT NULL,
+    sample_extraction_date DATE,
+    sample_extraction_desc TEXT,
+    extraction_solvent TEXT,
+    extraction_protocol TEXT,
+    extraction_volume DOUBLE,
+    resuspension_process TEXT,
+    extract_cleanup TEXT,
+    storage_description TEXT,
+    storage_location TEXT,
+    storage_date DATE,
+    storage_temparature DOUBLE,
+    preparation_protocol TEXT,
+    preparation_date DATE,
+    storage_condition TEXT,
+    sample_extraction_times INTEGER,
+    instrument_manufacturer CHAR(512),
+    instrument_model_name CHAR(512),
+    instrument_software_package CHAR(512),
+    instrument_version_number_or_date CHAR(512),
+    derivatization_method CHAR(512),
+    reagents_used_for_derivation CHAR(512),
+    derivatization_temperature CHAR(512),
+    derivatization_duration CHAR(512),
+    injector_model CHAR(512),
+    injector_software_version CHAR(512),
+    method_name TEXT,
+    injection_volume CHAR(512),
+    wash_cycles CHAR(512),
+    solvent CHAR(512),
+    sample_size CHAR(512),
+    column_manufacturer CHAR(512),
+    product_name_and_catalogue_number_of_column CHAR(512),
+    stationary_media_composition CHAR(512),
+    internal_diameter_of_column CHAR(512),
+    length_of_column CHAR(512),
+    column_temperature_program TEXT,
+    column_head_pressure CHAR(512),
+    flow_rate DOUBLE,
+    seperation_method_name CHAR(512),
+    injector_temperature CHAR(512),
+    split_splitless_mode CHAR(512),
+    split_ratio CHAR(512),
+    mobile_phase_composition TEXT,
+    mobile_phase_flow_rate DOUBLE,
+    thermal_gradient_profiles TEXT,
+    validation_sample CHAR(512),
+    internal_standards CHAR(512),
+    chromatographic_resolution CHAR(512),
+    cycle_per_column INTEGER,
+    cycle_per_injector INTEGER,
+    cycle_per_septum CHAR(512),
+    cycle_per_blank INTEGER,
+    SOP_protocol_name CHAR(512),
+    date_of_analysis DATE,
+    operator INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    deviation_from_SOP TEXT,
+    publication_refernce TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:55.616648
+CREATE TABLE liquid_chromatography(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    sample_id INTEGER NOT NULL,
+    sample_extraction_date DATE,
+    sample_extraction_desc TEXT,
+    extraction_solvent TEXT,
+    extraction_protocol TEXT,
+    extraction_volume DOUBLE,
+    resuspension_process TEXT,
+    extract_cleanup TEXT,
+    storage_description TEXT,
+    storage_location TEXT,
+    storage_date DATE,
+    storage_temparature DOUBLE,
+    preparation_protocol TEXT,
+    preparation_date DATE,
+    storage_condition TEXT,
+    sample_extraction_times INTEGER,
+    instrument_manufacturer CHAR(512),
+    instrument_model_name_ornumber CHAR(512),
+    instrument_software_package CHAR(512),
+    instrument_version_number_or_date CHAR(512),
+    injector_model CHAR(512),
+    injector_software_version CHAR(512),
+    method_name TEXT,
+    injection_volume CHAR(512),
+    wash_cycles CHAR(512),
+    solvent CHAR(512),
+    sample_size_or_concentration CHAR(512),
+    column_manufacturer CHAR(512),
+    product_name_and_catalogue_number_of_column CHAR(512),
+    stationary_media_composition CHAR(512),
+    internal_diameter_of_column CHAR(512),
+    length_of_column TEXT,
+    column_temperature_program TEXT,
+    column_head_pressure DOUBLE,
+    flow_rate DOUBLE,
+    seperation_method_name CHAR(512),
+    injector_temperature CHAR(512),
+    split_splitless_mode CHAR(512),
+    split_ratio CHAR(512),
+    mobile_phase_composition TEXT,
+    mobile_phase_flow_rate DOUBLE,
+    solvent_gradient_profiles TEXT,
+    validation_sample CHAR(512),
+    internal_standards CHAR(512),
+    chromatographic_resolution CHAR(512),
+    cycle_per_column INTEGER,
+    cycle_per_injector INTEGER,
+    cycle_per_septum CHAR(512),
+    cycle_per_blank INTEGER,
+    SOP_protocol_name CHAR(512),
+    date_of_analysis DATE,
+    operator INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    deviation_from_SOP TEXT,
+    publication_refernce TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:55.758496
+CREATE TABLE mass_spectroscopy(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    manufacturer CHAR(512),
+    model CHAR(512),
+    oper_soft_name CHAR(512),
+    oper_soft_ver CHAR(512),
+    ionization_mode CHAR(512),
+    polarity CHAR(512),
+    vaccum_pressure CHAR(512),
+    len_voltages CHAR(512),
+    gas_flows CHAR(512),
+    sour_temp CHAR(512),
+    type_of_analyzer CHAR(512),
+    m_range CHAR(512),
+    calibration_date DATE,
+    resolution1 CHAR(512),
+    mass_accuracy1 CHAR(512),
+    log_program CHAR(512),
+    spectral_acquisition_rate CHAR(512),
+    concentration CHAR(512),
+    lock_mass CHAR(512),
+    flow_rate CHAR(512),
+    frequency CHAR(512),
+    add_info TEXT,
+    tune CHAR(512),
+    sensitivity CHAR(512),
+    mass_accuracy2 CHAR(512),
+    resolution2 CHAR(512),
+    SOP_protocol TEXT,
+    date_of_data_acquistion DATE,
+    operator CHAR(512),
+    data_acquisition_rate CHAR(512),
+    deviation_from_SOP CHAR(512),
+    replicate_sample_analysis INTEGER
+);
+success!
+timestamp: 2013-03-11T10:35:55.899847
+CREATE TABLE spectrophotometry(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    wavelength CHAR(512),
+    optical_density CHAR(512),
+    Final_concentration_of_compound CHAR(512)
+);
+success!
+timestamp: 2013-03-11T10:35:56.035813
+CREATE TABLE raw_data_storage_information(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_name INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    email_id_of_person CHAR(512),
+    raw_data_file_name CHAR(512),
+    raw_data_file_upload CHAR(512),
+    raw_data_standard_format CHAR(512),
+    raw_data_standard_format_upload CHAR(512),
+    additional_information_about_data TEXT,
+    additional_information_upload CHAR(512),
+    date_of_data_upload DATE
+);
+success!
+timestamp: 2013-03-11T10:35:56.170539
+CREATE TABLE feedback(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feedback_on CHAR(512),
+    feedback_body TEXT,
+    feedback_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:56.297155
+CREATE TABLE sample_files(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample INTEGER REFERENCES sample (id) ON DELETE CASCADE,
+    file CHAR(512) NOT NULL,
+    user INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    description TEXT
+);
+success!
+timestamp: 2013-03-11T10:35:56.469166
+CREATE TABLE plugin_wiki_page(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug CHAR(512),
+    title CHAR(512),
+    is_public CHAR(1),
+    body TEXT,
+    role INTEGER REFERENCES auth_group (id) ON DELETE CASCADE,
+    changelog CHAR(512),
+    is_active CHAR(1),
+    created_on TIMESTAMP,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    modified_on TIMESTAMP,
+    modified_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:56.593526
+CREATE TABLE plugin_wiki_page_archive(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    current_record INTEGER REFERENCES plugin_wiki_page (id) ON DELETE CASCADE,
+    slug CHAR(512),
+    title CHAR(512),
+    is_public CHAR(1),
+    body TEXT,
+    role INTEGER REFERENCES auth_group (id) ON DELETE CASCADE,
+    changelog CHAR(512),
+    is_active CHAR(1),
+    created_on TIMESTAMP,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    modified_on TIMESTAMP,
+    modified_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:56.751104
+CREATE TABLE plugin_wiki_attachment(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tablename CHAR(512),
+    record_id INTEGER,
+    name CHAR(512),
+    filename CHAR(512),
+    is_active CHAR(1),
+    created_on TIMESTAMP,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    modified_on TIMESTAMP,
+    modified_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:56.890024
+CREATE TABLE plugin_wiki_comment(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tablename CHAR(512),
+    record_id INTEGER,
+    body CHAR(512),
+    is_active CHAR(1),
+    created_on TIMESTAMP,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    modified_on TIMESTAMP,
+    modified_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:57.013223
+CREATE TABLE plugin_wiki_tag(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name CHAR(512),
+    links INTEGER,
+    is_active CHAR(1),
+    created_on TIMESTAMP,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE,
+    modified_on TIMESTAMP,
+    modified_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T10:35:57.137938
+CREATE TABLE plugin_wiki_link(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag INTEGER REFERENCES plugin_wiki_tag (id) ON DELETE CASCADE,
+    table_name CHAR(512),
+    record_id INTEGER
+);
+success!
+timestamp: 2013-03-11T10:35:57.261309
+CREATE TABLE plugin_wiki_rating(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tablename CHAR(512),
+    record_id INTEGER,
+    rating DOUBLE,
+    counter INTEGER
+);
+success!
+timestamp: 2013-03-11T10:35:57.374549
+CREATE TABLE plugin_wiki_rating_aux(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    master INTEGER REFERENCES plugin_wiki_rating (id) ON DELETE CASCADE,
+    rating DOUBLE,
+    created_by INTEGER REFERENCES auth_user (id) ON DELETE CASCADE
+);
+success!
+timestamp: 2013-03-11T11:22:37.199841
+ALTER TABLE plant_growth_condition ADD hydroponic_supplier CHAR(512);
+timestamp: 2013-03-11T11:22:37.361608
+ALTER TABLE plant_growth_condition ADD climate_chamber_co2_concentration CHAR(512);
+timestamp: 2013-03-11T11:22:37.515955
+ALTER TABLE plant_growth_condition ADD season CHAR(512);
+timestamp: 2013-03-11T11:22:37.686912
+ALTER TABLE plant_growth_condition ADD hydroponic_type CHAR(512);
+timestamp: 2013-03-11T11:22:37.845872
+ALTER TABLE plant_growth_condition ADD hydroponic_volume CHAR(512);
+timestamp: 2013-03-11T11:22:37.991222
+ALTER TABLE plant_growth_condition ADD hydroponic_number_of_plats CHAR(512);
+timestamp: 2013-03-11T11:22:38.150069
+ALTER TABLE plant_growth_condition ADD hydroponic_nutrient_concentration CHAR(512);
+timestamp: 2013-03-11T11:22:38.308446
+ALTER TABLE plant_growth_condition ADD hydroponic_aeration_provided CHAR(1);
+timestamp: 2013-03-11T11:22:38.456302
+ALTER TABLE plant_growth_condition ADD hydroponic_frequency CHAR(512);
+timestamp: 2013-03-11T11:22:38.604274
+ALTER TABLE harvests ADD harvest_storage_location CHAR(512);
+timestamp: 2013-03-11T11:22:38.767805
+ALTER TABLE extraction_preparation ADD harvest_stage CHAR(512);
+timestamp: 2013-03-11T11:22:38.923956
+ALTER TABLE extraction_preparation ADD extraction_protocol_name TEXT;
+timestamp: 2013-03-11T11:22:39.057921
+ALTER TABLE extraction_preparation ADD amount_of_sample_taken CHAR(512);
+timestamp: 2013-03-11T11:22:39.276365
+ALTER TABLE gas_chromatography ADD sample_phase CHAR(512);
+timestamp: 2013-03-12T12:03:13.983067
+ALTER TABLE gas_chromatography ADD external_standards CHAR(512);
+timestamp: 2013-03-12T12:03:14.119555
+ALTER TABLE gas_chromatography ADD tergetted_or_untargtted_approach CHAR(512);
+timestamp: 2013-03-12T12:03:14.226866
+ALTER TABLE gas_chromatography ADD detector CHAR(512);
+timestamp: 2013-03-12T12:03:14.367207
+ALTER TABLE liquid_chromatography ADD external_standards CHAR(512);
+timestamp: 2013-03-12T12:03:14.462780
+ALTER TABLE liquid_chromatography ADD tergetted_or_untargtted_approach CHAR(512);
+timestamp: 2013-03-12T12:03:14.583847
+ALTER TABLE liquid_chromatography ADD detector CHAR(512);
+timestamp: 2013-03-12T12:03:14.735419
+ALTER TABLE raw_data_storage_information ADD no_of_peaks_unidentified INTEGER;
+timestamp: 2013-03-12T12:03:14.837764
+ALTER TABLE raw_data_storage_information ADD identification_of_metabolites TEXT;
+timestamp: 2013-03-12T12:03:14.945119
+ALTER TABLE raw_data_storage_information ADD no_of_perks INTEGER;
+timestamp: 2013-03-12T12:03:15.040619
+ALTER TABLE raw_data_storage_information ADD number_of_metabolites INTEGER;
+timestamp: 2013-03-12T12:03:15.148114
+ALTER TABLE raw_data_storage_information ADD referred_library CHAR(512);
+timestamp: 2013-03-12T12:41:42.423911
+ALTER TABLE biosource ADD phenotype CHAR(512);
+timestamp: 2013-03-12T12:41:42.571378
+ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;
+timestamp: 2013-03-12T12:42:25.848589
+ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;
+timestamp: 2013-03-12T14:10:08.200993
+ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;
+timestamp: 2013-03-12T14:26:02.281884
+ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;

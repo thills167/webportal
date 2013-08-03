@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+<h5> Register for {{=A(ptitle.name,_href=URL('project_viewer',args=ptitle.id))}}</h5>
+{{if not auth.user:}}
+<p>You must be logged in to register a project </p>
+{{else:}}
+{{=form}}
+{{pass}}
+{{pass}}

@@ -1,0 +1,676 @@
+# -*- coding: utf-8 -*-
+# this file is released under public domain and you can use without limitations
+
+#########################################################################
+## This is a samples controller
+## - index is the default action of any application
+## - user is required for authentication and authorization
+## - download is for downloading files uploaded in the db (does streaming)
+## - call exposes all registered services (none by default)
+#########################################################################
+
+def index():
+    """
+    example action using the internationalization operator T and flash
+    rendered by views/default/index.html or views/generic.html
+    """
+    redirect(URL('plugin_wiki','page/home'))
+
+def user():
+    """
+    exposes:
+    http://..../[app]/default/user/login
+    http://..../[app]/default/user/logout
+    http://..../[app]/default/user/register
+    http://..../[app]/default/user/profile
+    http://..../[app]/default/user/retrieve_password
+    http://..../[app]/default/user/change_password
+    use @auth.requires_login()
+        @auth.requires_membership('group name')
+        @auth.requires_permission('read','table name',record_id)
+    to decorate functions that need access control
+    """
+    return dict(form=auth())
+
+def download():
+    """
+    allows downloading of uploaded files
+    http://..../[app]/default/download/[filename]
+    """
+    return response.download(request,db)
+
+
+def call():
+    """
+    exposes services. for example:
+    http://..../[app]/default/call/jsonrpc
+    decorate with @services.jsonrpc the functions to expose
+    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv
+    """
+    return service()
+
+
+def authenticate(uid,pid,func):   
+   result = db(db.role.user == uid)(db.role.project == pid).select(db.role.ALL)
+   myroles = [role_list[int(k.role)] for k in result]
+   is_coordinator = db(db.project.project_coordinator == uid).select(db.project.ALL)
+   if func == 'roles':
+	if len(is_coordinator):
+	  error = ''
+	else:
+	   error = 'You must be a project co-ordinator to manage roles'
+	return error  
+   if func == 'add_project':
+	if len(is_coordinator):
+	  error = ''
+	else:
+	   error = ''
+        return error
+   if func == 'add_sample':
+	if 'experimentalist' in myroles:
+	  error = ''
+	else:
+	   error = 'SignUp for  "Experimentalist Role" in this project to add a sample. Use Browser back button to navigate to Project View.'
+        return error
+   if func == 'experimentalist':
+	if 'experimentalist' in myroles:
+	  error = ''
+	else:
+	   error = 'You must be an experimentalist to add the biosource information of a sample'
+        return error
+   if func == 'my_samples':
+	if  'experimentalist' in myroles:
+	  error = ''
+	else:
+	   error = 'You are not authorized to view this page'
+        return error
+def basic_groups(pid):
+    """ creates the basic groups on general basis or id basis """
+    if not pid:
+        for i in role_list:
+	   auth.add_group(i,i) 
+    else:
+        pid_groups = [str(pid)+'#'+i for i in role_list]
+	for k in pid_groups:
+	   auth.add_group(k,k)
+    return locals()	   
+
+
+
+def add_project():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), [])
+    ]
+    error = authenticate(auth.user.id,'','add_project')
+    form = SQLFORM(db.project,fields=['name','code','start_date','project_description','project_description_upload','project_literature_reference','project_journal_name','project_publication_date','project_pubmed_id'])
+    form.vars.project_coordinator = auth.user.id
+    if form.process().accepted:
+       response.flash ='accepted'
+       result = db(db.project.name == form.vars.name).select(db.project.ALL).first()
+       basic_groups(result.id)
+       db.role.insert(user=auth.user.id,project=result.id,role=6,approval_status=1,member_since=now)
+       redirect(URL('project_viewer',args = form.vars.id))
+    elif form.errors:
+       response.flash = 'errors'
+    return locals()
+
+def remove_project():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), [])
+    ]
+    """takes an id and removes the project """ 
+    pid  = request.args(0)
+    pid_groups = [str(pid)+'#'+i for i in role_list]
+    for z in pid_groups:
+	pgid = auth.id_group(z)
+	auth.del_group(pgid)
+    del db.project[pid]
+    return locals()
+
+def new_affiliation():
+    form = SQLFORM(db.affiliation)
+    return locals()
+
+def edit_project():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), []),
+    (T('Project'), False, URL('default','project_viewer',args=request.args),[])
+    ]
+    crud.settings.update_next = URL('project_viewer',args=request.args)
+    form=crud.update(db.project,request.args(0))
+    return locals();
+ 
+@auth.requires_login()
+def project_viewer():
+    pid = request.args[-1]
+    project=db(db.project.id==pid).select(db.project.ALL).first()
+    cord = db(db.auth_user.id==project.project_coordinator).select(db.auth_user.ALL).first()
+    
+    if authenticate(auth.user.id,'','roles') == '':
+      response.menu = [
+      (T('Home'), False, URL('default','list_all_projects'), []),
+      (T('Project'), False, URL('default','project_viewer',args=request.args[-1]),[
+      (T('Grant Role'),False,URL('roles',args=project.id)),
+      (T('Edit Project'),False,URL('edit_project',args=project.id)),
+      (T('SignUP'),False,URL('reg_project',args=project.id))]
+      )
+      ]
+    else :
+      response.menu = [
+      (T('Home'), False, URL('default','list_all_projects'), []),
+      (T('Project'), False, URL('default','project_viewer',args=request.args[-1]),[
+      (T('SignUP'),False,URL('reg_project',args=project.id))]
+      )
+      ]
+      
+    if project.project_status == '1':
+      response.menu+= [
+      (T('Published Samples'), False,URL('list_all_pub_samples',args=(pid)),[])
+      ]
+    elif authenticate(auth.user.id,pid,'add_sample')=='':
+        response.menu+= [
+        (T('Samples'), False,URL('my_samples',args=(pid)),[
+        (T('My Samples'), False,URL('my_samples',args=(pid))),
+        (T('New Sample'),False,URL('add_sample',args=pid))])
+        ]
+      
+      
+    users=db(db.role.project==pid)(db.role.project == db.project.id)(db.role.user==db.auth_user.id).select(db.role.ALL,db.auth_user.ALL)
+    is_coordinator = ''
+    myroles = ''
+    if auth.user:
+      is_coordinator = db(db.project.id == pid)(db.project.project_coordinator == auth.user.id).select(db.project.ALL).first()
+      result = db(db.role.user == auth.user.id)(db.role.project == pid).select(db.role.ALL)
+      myroles = [role_list[int(k.role)] for k in result]
+      
+    return locals()
+
+
+def add_sample():
+  """ creates a exp on an project basis and should continue to fill the bio source data """
+  """ available to the experimentalist """ 
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  if 'new' in request.args:
+   pid = request.args[-3]
+  else:
+   pid = request.args(0)
+  error = authenticate(auth.user.id,pid,'add_sample') 
+  form = SQLFORM(db.sample,fields=['name','code','description'])
+  if form.validate():
+      i = db.sample.insert(experimentalist=auth.user.id,name=form.vars.name,code=form.vars.code,description=form.vars.description,project=pid,working_status=1,publication_status=0)
+      response.flash = 'sample has been created'
+      redirect(URL('list_all_dev_projects',args=['project','sample.project',pid,'biosource.sample_name',i,'new','biosource'])) 
+      # redirect to the sample creation 
+  elif form.errors:
+      response.flash = 'Form has errors'
+  return locals()
+def sample_viewer():
+   response.menu = [
+   (T('Home'), False, URL('default','list_all_projects'), [])
+   ]
+   i = request.args[-1]
+   if 'view' in request.args: 
+	form = SQLFORM(db.sample, i,readonly =True)
+   if 'edit' in request.args: 
+	form = SQLFORM(db.sample, i)
+   if form.process().accepted:
+	response.flash = 'form accepted'
+	redirect(URL('list_all_dev_projects',args = request.args[0:-3])) 
+   elif form.errors:
+	response.flash = 'form has errors'
+   return dict(form=form)
+
+def list_all_projects():
+    response.menu = [
+    #(T('Home'), False, URL('default','index'), [])
+    (T('Home'), False, URL('default','list_all_projects'), []),
+    (T('Project'), False, URL('default','list_all_projects'), [(T('Add Project'),False,URL('default','add_project'))])
+    ]
+    
+    pub_projects = db(db.project.project_status == 1).select(db.project.ALL)
+    dev_projects = db(db.project.project_status == 0).select(db.project.ALL)
+    authenticated = 'no'
+    if auth.user:
+     authenticated = authenticate(auth.user.id,'','add_project')
+    
+    """    
+    if not auth.user or request.args(0) == 1:
+       q1 = db(db.project.project_status == 1)
+       q2 = db(db.sample.working_status == 1)
+
+       const = {'project':q1,'sample':q2}
+       grid = SQLFORM.smartgrid(db.project,create=False,editable=False,linked_tables=['sample','biosource','treatments','harvests','extraction_preparation','gas_chromatography','liquid_chromatography','mass_spectroscopy'])"""
+    return locals()
+
+def list_all_pub_projects():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), [])
+    ]
+    q1 = (db.project.project_status ==  1)
+    q2 = (db.sample.publication_status == True)
+    ck = {'project':q1,'sample':q2}
+    fi = [db.project.name,db.project.project_coordinator,db.project.start_date,db.project.project_status,db.sample.name,db.sample.code,db.biosource.sample_name,db.plant_growth_condition.sample_name,db.treatments.sample_name,db.harvests.sample_name,db.extraction_preparation.sample_name,db.gas_chromatography.sample_name,db.liquid_chromatography.sample_name,db.mass_spectroscopy.sample_name]
+    if 'view' in request.args or 'edit' in request.args or 'new' in request.args:
+     	router(request.args)
+    grid = SQLFORM.smartgrid(db.project,ck,fields=fi,editable=False,deletable=False,create = False,linked_tables=['sample','biosource','plant_growth_condition','treatments','harvests','extraction_preparation','gas_chromatography','liquid_chromatography','mass_spectroscopy']) 
+    
+    return locals()
+
+def list_all_dev_projects():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), [])
+    ]
+    q1 = (db.project.project_status ==  0)
+    q2 = (db.sample.experimentalist == auth.user.id)
+    ck = {'project':q1,'sample':q2}
+    fi = [db.project.name,db.project.project_coordinator,db.project.start_date,db.project.project_status,db.sample.name,db.sample.code,db.sample.publication_status,db.biosource.sample_name,db.plant_growth_condition.sample_name,db.treatments.sample_name,db.harvests.sample_name,db.extraction_preparation.sample_name,db.gas_chromatography.sample_name,db.liquid_chromatography.sample_name,db.mass_spectroscopy.sample_name]
+    edit_dict = {'project':False}
+    delete_dict = {'project':False}
+    create_dict = {'project':False}
+    if 'view' in request.args or 'edit' in request.args or 'new' in request.args:
+     	router(request.args)
+    grid = SQLFORM.smartgrid(db.project,ck,fields=fi,editable=edit_dict,create=create_dict,deletable=delete_dict,linked_tables=['sample','biosource','plant_growth_condition','treatments','harvests','extraction_preparation','gas_chromatography','liquid_chromatography','mass_spectroscopy']) 
+    return locals()
+def my_samples():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), [])
+    ]
+    """ all my samples in the project with permissions to edit delete publish/unpublish samples """
+    error = authenticate(auth.user.id,request.args(0),'add_sample') 
+    l =  ['project','sample.project',request.args(0)]
+    if error == '':
+      redirect(URL('list_all_dev_projects',args=l))
+    return locals()
+
+def list_all_users():
+    response.menu = [
+    (T('Home'), False, URL('plugin_wiki','page/home'), [])
+    ]
+    grid = SQLFORM.smartgrid(db.auth_user,editable =False,deletable=False,create=False,linked_tables=[])
+    return locals()
+
+
+
+def list_all_samples1():
+    proj_id = request.args(0)
+    pub_samples = db((db.sample.working_status == 1)&(db.sample.project == proj_id)).select(db.sample.ALL)
+    dev_samples = db((db.sample.working_status == 0)&(db.sample.project == proj_id)).select(db.sample.ALL)
+    return locals()
+
+def view_published_samples():
+    proj_id = request.args(0)
+    return locals() 
+
+def router(l):
+	if 'biosource' in l:
+	  redirect(URL('insert_biosource',args = l))
+	elif 'plant_growth_condition' in l:
+	  redirect(URL('insert_pgc',args = l))
+	elif 'treatments' in l:
+	  redirect(URL('insert_treatments',args = l))
+	elif 'harvests' in l:
+	  redirect(URL('insert_harvests',args = l))
+	elif 'extraction_preparation' in l:
+	  redirect(URL('insert_ep',args = l))
+	elif 'gas_chromatography' in l:
+	  redirect(URL('insert_gc',args = l))
+	elif 'liquid_chromatography' in l:
+	  redirect(URL('insert_lc',args = l))
+	elif 'mass_spectroscopy' in l:
+	  redirect(URL('insert_ms',args = l))
+	elif 'sample' in l and 'new' in l:		
+	  redirect(URL('add_sample',args = l))
+	elif 'sample' in l:		
+	  redirect(URL('sample_viewer',args = l))
+	elif 'project' in l:
+	  redirect(URL('project_viewer',args=l))
+	else : 
+	  redirect(URL('index'))
+
+def list_all_pub_samples():
+#    proj_id = request.args(0)
+#    pub = request.args(1) # if pub == 1 show published samples otherwise non published samples
+#   pub_query = (db.sample.working_status == 1 and db.sample.project == proj_id)
+#   unpub_query = (db.sample.working_status == 0 and db.sample.project == proj_id)
+#   pquery_dict = {'sample':pub_query}
+#   nquery_dict = {'sample':unpub_query}
+#    if 'view' in request.args or 'edit' in request.args or 'new' in request.args:
+#       router(request.args)
+#    if 'view' in request.args or 'edit' in request.args or 'new' in request.args:
+#     	router(request.args)
+    
+    """an argument to display published and non-published samples"""
+    """ request.args(0) - project  , request.args(1) published"""
+
+    redirect(URL('list_all_pub_projects',args=['project','sample.project',request.args(0)]))
+    
+def list_all_dev_samples():
+   
+    redirect(URL('list_all_dev_projects',args=['project','sample.project',request.args(0)]))
+    return locals()
+
+def ajx_role():
+    """ an ajax call back which takes care of insert , update and delete in the roles table """
+    rid = request.args(1)
+    if request.args(0) == 'accept':
+       row = db(db.role.id == rid).update(approval_status = 1)
+       result = db(db.role.id == rid).select(db.role.ALL).first()
+       gid = auth.id_group(role_list[int(result.role)])
+       auth.add_membership(gid,result.user)
+    if request.args(0) == 'unblock':
+       del db.role[rid] 
+    if request.args(0) == 'block':
+       row = db(db.role.id == rid).update(approval_status = 2)
+    if request.args(0) == 'delete' or request.args(0) == 'deny':
+       result = db(db.role.id == rid).select(db.role.ALL).first()
+       gid = auth.id_group(role_list[int(result.role)])
+       auth.del_membership(gid,result.user)
+       del db.role[rid] 
+    return locals()
+
+def reg_project():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), []),
+    (T('Project'), False, URL('default','project_viewer',args=request.args),[])
+    ]
+    """ takes an id for the project and registers """
+    import datetime
+    now = datetime.datetime.now()
+    """ already requested """
+    pid = request.args(0)
+    ptitle = db(db.project.id == pid).select(db.project.ALL).first()
+    requested = db(db.role.user == auth.user.id)(db.role.project == pid)(db.role.approval_status == 0).select(db.role.ALL)
+    form = SQLFORM(db.role,fields=['role'])
+    if form.validate():
+       db.role.insert(user=auth.user.id,approval_status=0,project=pid,member_since=now,role=form.vars.role)
+       response.flash = 'accepted'
+    return locals() 
+def ajx_publish():
+    """ an ajax call back which takes care of publication status """
+    eid = request.args(1)
+    if request.args(0) == 'publish':
+       row = db(db.sample.id == eid).update(publication_status = True)
+    if request.args(0) == 'remove':
+       row = db(db.sample.id == eid).update(publication_status = False)
+    return locals()
+
+def roles():
+    response.menu = [
+    (T('Home'), False, URL('default','list_all_projects'), []),
+    (T('Project'), False, URL('default','project_viewer',args=request.args),[])
+    ]
+    """ complete interface for managing roles for a particular project"""
+    """ should be accessible to only project co-ordinators """
+    pid = request.args(0)
+    error = authenticate(auth.user.id,pid,'roles')
+    accepted = db(db.auth_user.id == db.role.user)(db.role.approval_status == 1)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)
+    pending = db(db.auth_user.id == db.role.user)(db.role.approval_status == 0)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)
+    blocked = db(db.auth_user.id == db.role.user)(db.role.approval_status == 2)(db.role.project == pid).select(db.role.ALL,db.auth_user.ALL)
+    return locals()
+   
+
+def home_page():
+    """ home page for a user , shows list of projects he is working on and his past work """
+    uid = request.args(0)
+    #my roles 
+    
+    roles = db(db.role.user == uid)(db.role.project == db.project.id).select(db.role.ALL,db.project.name) 
+    myroles = [role_list[int(p.role.role)] for p in roles]
+    k = {}
+    """
+    is_coordinator = db(db.project.project_coordinator==uid).select(db.project.ALL)
+    coordinating_projects = [row.name for row in is_coordinator]
+    value=''
+    for p in coordinating_projects:
+       value = value + ','+ p
+	  
+    k[6] = value[1:] """
+    for row in roles:
+       if row.role.role not in k:
+          k[row.role.role] = row.project.name
+       else:
+          k[row.role.role] = k[row.role.role] + ',' + row.project.name
+    com_exps = db(db.sample.working_status == 1)(db.sample.analyst == uid)(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)
+    incom_exps = db(db.sample.working_status == 1)((db.sample.analyst == uid) or (db.sample.experimentalist == uid))(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)
+    pub_exps = db(db.sample.working_status == 0)(db.sample.publication_status == True)((db.sample.analyst == uid) or (db.sample.experimentalist == uid))(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)
+    unpub_exps = db(db.sample.working_status == 0)(db.sample.publication_status == False)((db.sample.analyst == uid) or (db.sample.experimentalist == uid))(db.sample.project == db.project.id).select(db.sample.ALL,db.project.id,db.project.name,orderby=db.sample.code)
+    for p in k:
+       list_projects = k[p].split(',')
+       proj = '' 
+       for d in list_projects:
+          res = db(db.project.name == d).select(db.project.ALL).first()
+          cat = ''
+          if res:
+             cat = A(res.name,_href=URL('project_viewer',args=res.id))
+          if proj == '':
+             proj=SPAN(cat)
+          else:
+           proj = SPAN(proj,',',cat)
+       k[p] = proj 
+    return locals()
+
+def insert_biosource():
+#  result = db(db.sample.id == sample_id).select(db.sample.ALL).first()
+#  error = authenticate(auth.user.id,result.project,'insert_biosource')
+   response.menu = [
+   (T('Home'), False, URL('default','list_all_projects'), [])
+   ]
+   redirect_args = request.args[0:-3]
+   if 'view' in request.args: 
+	       form=SQLFORM(db.biosource,request.args[-1],readonly = True)	  
+   elif 'edit' in request.args: 
+	       form=SQLFORM(db.biosource,request.args[-1])
+   elif 'new' in request.args:
+               hid = {}   
+	       form=SQLFORM(db.biosource,hidden={'sample_name':request.args[-3]})
+	       form.vars.sample_name = request.args[-3]
+ 	       redirect_args = request.args[0:-2]	 
+
+   f1=form[0][:2]
+   fs1=form[0][2:6]
+   f2=form[0][6:]
+   form[0]=TABLE(TABLE(f1),
+      FIELDSET(TAG.legend("Genotype"),TABLE(fs1)),TABLE(f2))
+   if form.process().accepted:
+     redirect(URL('list_all_dev_projects',args=redirect_args)) 
+     response.flash="Inserted entry"
+   return locals()
+
+
+def insert_pgc():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+	form=SQLFORM(db.plant_growth_condition,request.args[-1],readonly = True)
+  elif 'edit' in request.args: 
+	form=SQLFORM(db.plant_growth_condition,request.args[-1])
+  elif 'new' in request.args:
+	form=SQLFORM(db.plant_growth_condition)
+	redirect_args = request.args[0:-2]	 
+  fs1=form[0][:5]
+  fss1=form[0][5:9]
+  fss2=form[0][9:10]
+  fss3=form[0][10:15]
+  f2=form[0][15:18]
+  fs2=form[0][18:21]
+  fs3=form[0][21:27]
+  f3=form[0][27:]
+  t2=TABLE(FIELDSET(TAG.legend("Growth Support"),TABLE(fs1)))
+  t3=TABLE(FIELDSET(TAG.legend("Location"),TABLE(FIELDSET(TAG.legend("Field trail"),TABLE(fss1))),TABLE(fss2),TABLE(FIELDSET(TAG.legend("Green house"),TABLE(fss3)))))
+  t4=TABLE(FIELDSET(TAG.legend("Nutritional Regime"),TABLE(fs2)))
+  t5=TABLE(FIELDSET(TAG.legend("Date of Plant Establishment(YYYY-MM-DD)"),TABLE(fs3)))
+  form[0]=TABLE(FIELDSET(t2,t3,TABLE(f2),t4,t5,TABLE(f3)))
+  if form.process().accepted:
+    redirect(URL('list_all_dev_projects',args=redirect_args)) 
+    response.flash="form accepted"
+# redirect(URL('list_all_samples',args=['sample'])) 
+  else:
+    response.flsh="form has some errors"
+  return locals()
+
+def insert_ep():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+       form=SQLFORM(db.extraction_preparation,request.args[-1],readonly = True)
+  if 'edit' in request.args: 
+       form=SQLFORM(db.extraction_preparation,request.args[-1])
+  if 'new' in request.args:
+       form=SQLFORM(db.extraction_preparation)
+       form.vars.sample_name = request.args[-3]
+       redirect_args = request.args[0:-2]	 
+  t1=TABLE(FIELDSET(TAG.legend("SAMPLE EXTRACTION"),TABLE(form[0][:8]),TABLE(FIELDSET(TAG.legend("Extract Storage:"),TABLE(form[0][8:12])))))
+  t2=TABLE(FIELDSET(TAG.legend("SAMPLE PREPARATION"),TABLE(form[0][12:])))
+  form[0]=TABLE(FIELDSET(t1,t2))
+  if form.process().accepted:
+       response.flash="Inserted entry"
+       redirect(URL('list_all_dev_projects',args=redirect_args)) 
+  return locals()
+
+def insert_treatments():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+       form=SQLFORM(db.treatments,request.args[-1],readonly = True)
+  if 'edit' in request.args: 
+       form=SQLFORM(db.treatments,request.args[-1])
+  if 'new' in request.args:
+       form=SQLFORM(db.treatments)
+       form.vars.sample_name = request.args[-3] 
+       redirect_args = request.args[0:-2]	 
+  t1=TABLE(FIELDSET(TAG.legend("Treatment Factor"),TABLE(form[0][:3])))
+  form[0]=TABLE(FIELDSET(t1,TABLE(form[0][3:])))
+  if form.process().accepted:
+      response.flash="Inserted entry"
+      redirect(URL('list_all_dev_projects',args=redirect_args)) 
+  return locals()
+
+def insert_harvests():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+       form=SQLFORM(db.harvests,request.args[-1],readonly = True)
+  if 'edit' in request.args: 
+       form=SQLFORM(db.harvests,request.args[-1])
+  if 'new' in request.args:
+       form=SQLFORM(db.harvests)
+       form.vars.sample_name = request.args[-3]
+       redirect_args = request.args[0:-2]	 
+  t1=TABLE(FIELDSET(TAG.legend("Sample Storage"),TABLE(form[0][6:])))
+  form[0]=TABLE(FIELDSET(TABLE(form[0][:6]),t1))
+  if form.process().accepted:
+      response.flash="Inserted entry"
+      redirect(URL('list_all_dev_projects',args=redirect_args)) 
+  return locals()
+	  	
+def insert_gc():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+	form=SQLFORM(db.gas_chromatography,request.args[-1],readonly = True)
+  elif 'edit' in request.args: 
+        form=SQLFORM(db.gas_chromatography,request.args[-1])
+  elif 'new' in request.args:
+        redirect_args = request.args[0:-2]	 
+        form=SQLFORM(db.gas_chromatography)
+        form.vars.sample_name = request.args[-3]
+  t1=TABLE(FIELDSET(TAG.legend("CHROMATOGRAPHY INSTRUMENTAL"),TABLE(form[0][:4])))
+  t2=TABLE(FIELDSET(TAG.legend("DERIVATIZATION"),TABLE(form[0][4:8])))
+  t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][8:15])))
+  t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][15:23])))
+  t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][23:30])))
+  t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][30:33]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][33:37])))))
+  t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][37:])))
+  form[0]=TABLE(FIELDSET(t1,t2,t3,t4,t5,t6,t7))
+  if form.process().accepted:
+	response.flash="Inserted entry"
+	redirect(URL('list_all_dev_projects',args=redirect_args)) 
+#       redirect(URL('list_all_samples',args=['sample'])) 
+  return locals()
+
+def insert_lc():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+      form=SQLFORM(db.liquid_chromatography,request.args[-1],readonly = True)
+  if 'edit' in request.args: 
+      form=SQLFORM(db.liquid_chromatography,request.args[-1])
+  if 'new' in request.args:
+      redirect_args = request.args[0:-2]	 
+      form=SQLFORM(db.liquid_chromatography)
+      form.vars.sample_name = request.args[-3] 
+  t1=TABLE(FIELDSET(TAG.legend("CHROMATOGRAPHY INSTRUMENTAL"),TABLE(form[0][:4])))
+  t3=TABLE(FIELDSET(TAG.legend("AUTO-INJECTOR DETAILS"),TABLE(form[0][4:11])))
+  t4=TABLE(FIELDSET(TAG.legend("SEPERATION COLUMN AND PRE/GUARD COLUMN"),TABLE(form[0][11:19])))
+  t5=TABLE(FIELDSET(TAG.legend("SEPERATION PARAMETERS"),TABLE(form[0][19:26])))
+  t6=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][26:29]),TABLE(FIELDSET(TAG.legend("Cycle per"),TABLE(form[0][29:33])))))
+  t7=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][33:])))
+  form[0]=TABLE(FIELDSET(t1,t3,t4,t5,t6,t7))
+  if form.process().accepted:
+      response.flash="Inserted entry"
+      redirect(URL('list_all_dev_projects',args=redirect_args)) 
+#     redirect(URL('list_all_samples',args=['sample'])) 
+  return locals()
+def insert_ms():
+  response.menu = [
+  (T('Home'), False, URL('default','list_all_projects'), [])
+  ]
+  redirect_args = request.args[0:-3]	 
+  if 'view' in request.args: 
+    form=SQLFORM(db.mass_spectroscopy,request.args[-1],readonly = True)
+  elif 'edit' in request.args: 
+    form=SQLFORM(db.mass_spectroscopy,request.args[-1])
+  elif 'new' in request.args:
+    redirect_args = request.args[0:-2]	 
+    form=SQLFORM(db.mass_spectroscopy)
+    form.vars.sample_name = request.args[-3]
+  t1=TABLE(FIELDSET(TAG.legend("INSTRUMENTAL DETAILS"),TABLE(form[0][:4])))
+  t2=TABLE(FIELDSET(TAG.legend("IONISATION SOURCE"),TABLE(form[0][4:10])))
+  t3=TABLE(FIELDSET(TAG.legend("MASS ANALYZER"),TABLE(form[0][10:18]),TABLE(FIELDSET(TAG.legend("Lock spray"),TABLE(form[0][18:22]))),TABLE(form[0][22:23])))
+  t4=TABLE(FIELDSET(TAG.legend("QUALITY CONTROL"),TABLE(form[0][23:27])))
+  t5=TABLE(FIELDSET(TAG.legend("DATA ACQUISITION"),TABLE(form[0][27:])))
+  form[0]=TABLE(FIELDSET(t1,t2,t3,t4,t5))
+  if form.process().accepted:
+      	response.flash="Inserted entry"
+        redirect(URL('list_all_dev_projects',args=redirect_args)) 
+#     	redirect(URL('list_all_samples'),args=['sample']) 
+  return locals()
+	
+@auth.requires_signature()
+def data():
+    """
+    http://..../[app]/default/data/tables
+    http://..../[app]/default/data/create/[table]
+    http://..../[app]/default/data/read/[table]/[id]
+    http://..../[app]/default/data/update/[table]/[id]
+    http://..../[app]/default/data/delete/[table]/[id]
+    http://..../[app]/default/data/select/[table]
+    http://..../[app]/default/data/search/[table]
+    but URLs must be signed, i.e. linked with
+      A('table',_href=URL('data/tables',user_signature=True))
+    or with the signed load operator
+      LOAD('default','data.load',args='tables',ajax=True,user_signature=True)
+    """
+    return dict(form=crud())
+
+def drop_tables():
+    #are you sure you want to do this?
+    for t in ['auth_user','auth_group', 'auth_membership', 'auth_permission', 'auth_event']: #,'sample','biosource']:
+        db[t].drop()
+    pass
+
+

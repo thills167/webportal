@@ -1,0 +1,19 @@
+<style>
+.text {
+ width:400px;
+ height:100px;
+}
+</style>
+<script>
+jQuery(document).ready(function(){
+		   jQuery('#feedback_form').show();
+#		   jQuery('#feedback_button').click(function(){ jQuery('#feedback_form').slideToggle();});
+});
+</script>
+<div class="feedback">
+<button id="feedback_button">Search</button>
+<div id="feedback_form">
+{{=form}}
+</div>
+</div>
+

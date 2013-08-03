@@ -1,0 +1,13 @@
+{{extend 'layout.html'}}
+<h4>List of all published Samples </h4>
+<ol>
+{{for sample in pub_samples:}}
+  {{=LI(A (sample.name,_href=URL('sample_viewer',args=sample.id)) ,BR() ) }}
+{{pass}}
+</ol>
+<h4>List of all unpublished samples </h4>
+<ol>
+{{for sample in dev_samples:}}
+  {{=LI(A (sample.name,_href=URL('sample_viewer',args=sample.id)) ,BR() ) }}
+{{pass}}
+</ol>

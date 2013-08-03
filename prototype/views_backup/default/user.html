@@ -1,0 +1,79 @@
+<style>
+textarea{
+width:100px;
+height:50px;
+}
+</style>
+{{extend 'layout.html'}}
+
+{{if request.args(0)=='register':}}
+<h2>Registration Form</h2>
+</br>
+<h5>All the fields are mandatory,except the telephone number.</h5> 
+{{else:}}
+<h2>{{=T( request.args(0).replace('_',' ').capitalize() )}}</h2>
+{{pass}}
+<div id="web2py_user_form">
+ {{if False:# request.args(0)=='register':}}
+  {{=form.custom.begin}}
+  <div id="user1_name">
+  </div>
+
+  <div id = "user_name">
+  <table>
+<td>{{=form.custom.label.title}} {{=form.custom.widget.title}}</td>
+<tr>
+<td>{{=form.custom.label.first_name}}{{=form.custom.widget.first_name}}</td><td> {{=form.custom.label.middle}} {{=form.custom.widget.middle}}</td><td> {{=form.custom.label.last_name}} {{=form.custom.widget.last_name}}</td>
+</tr>
+</br>
+<tr>
+<td><table><tr>{{=form.custom.label.position}}</tr></br><tr>{{=form.custom.widget.position}}</tr></table> </td>
+<td>{{=form.custom.label.organization}} {{=form.custom.widget.organization}} </td>
+</tr>
+</br>
+<tr><td>
+{{=form.custom.label.address}} {{=form.custom.widget.address}} </td><td>
+{{=form.custom.label.postal_code}} {{=form.custom.widget.postal_code}} </td>
+</tr>
+<tr><td>
+{{=form.custom.label.city}} {{=form.custom.widget.city}} </td><td>
+{{=form.custom.label.country}} {{=form.custom.widget.country}}</td>
+</tr>
+</br>
+<tr> <td>
+{{=form.custom.label.Tel}} {{=form.custom.widget.Tel}} </td><td>
+{{=form.custom.label.mobile}} {{=form.custom.widget.mobile}} </td><td>
+{{=form.custom.label.email}} {{=form.custom.widget.email}} </td>
+</tr>
+</br>
+<tr><td>
+{{=form.custom.label.registration_at}} {{=form.custom.widget.registration_at}}</td>
+</tr>
+<tr> <td>
+{{=form.custom.label.password}} {{=form.custom.widget.password}} </td><td>
+</tr>
+</table>
+</br>
+ {{=form.custom.submit}}
+
+  </div>
+  {{=form.custom.end}}
+
+ {{else:}}
+  {{=form}}
+  {{if request.args(0)=='login':}}
+  {{if not 'register' in auth.settings.actions_disabled:}}
+  <br/>
+  <a href="{{=URL(args='register')}}">{{=T('Register')}}</a>
+  {{pass}}
+  {{if not 'request_reset_password' in auth.settings.actions_disabled:}}
+  <br/>
+  <a href="{{=URL(args='request_reset_password')}}">{{=T('Lost Password')}}</a>
+  {{pass}}
+  {{pass}}
+ {{pass}}
+</div>
+<script language="javascript"><!--
+      jQuery("#web2py_user_form input:visible:enabled:first").focus();
+      //--></script>
+

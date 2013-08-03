@@ -1,0 +1,48 @@
+{{left_sidebar_enabled,right_sidebar_enabled=True,False}}
+{{extend 'layout.html'}}
+{{left_sidebar=True}}
+{{block left_sidebar}}
+<ul>
+<!--li>{{=A(T("List all published projects"), _href=URL('list_all_pub_projects'))}}</li>
+<li>{{=A(T("List all development projects"), _href=URL('list_all_dev_projects'))}}</li-->
+{{if myroles:}}
+<li>{{=A(T("Add Project"), _href=URL('add_project'))}}</li>
+{{pass}}
+</ul>
+{{end}}
+<h4>My roles </h4>
+<table>
+<th>Role</th>
+<th>List of projects</th>
+{{for row in k:}}
+<tr>
+<td>{{=role_list[int(row)]}}</td>
+<td>{{=k[row]}} </td>
+{{pass}}
+{{pass}}
+</tr>
+{{pass}}
+</table>
+<h3>List of published Samples </h3>
+<table>
+{{for exp in pub_exps:}}
+<tr id="pub{{=exp.sample.id}}">
+<td>{{=CAT((exp.sample.name+'('+exp.sample.code+')'+' from '),A(exp.project.name,_href=URL('project_viewer',args=exp.project.id)))}}</td>
+<td><button onclick="ajax('{{=URL('ajx_publish',args=('remove',exp.sample.id))}}',[],null);jQuery('tr#pub{{=exp.sample.id}}').slideUp()";>Remove</button></td>
+</tr>
+{{pass}}
+</table>
+<h3>List of unpublished Samples </h3>
+<table>
+{{for exp in unpub_exps:}}
+<tr id="unpub{{=exp.sample.id}}">
+<td>{{=CAT((exp.sample.name+'('+exp.sample.code+')'+' from '),A(exp.project.name,_href=URL('project_viewer',args=exp.project.id)))}}</td>
+<td><button onclick="ajax('{{=URL('ajx_publish',args=('publish',exp.sample.id))}}',[],null);jQuery('tr#unpub{{=exp.sample.id}}').slideUp()";>Publish</button></td>
+</tr>
+{{pass}}
+</table>
+<h3>List of working Samples </h3>
+{{for exp in incom_exps:}}
+{{=CAT((exp.sample.name+'('+exp.sample.code+')'+' from '),A(exp.project.name,_href=URL('project_viewer',args=exp.project.id)))}}
+{{pass}}
+

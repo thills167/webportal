@@ -1,0 +1,76 @@
+{{extend 'layout.html'}}
+<script>
+$(document).ready(function() {
+  
+	    $('#task_step_size__row').slideUp();
+	    $('#task_fwhm__row').slideUp();  
+ 
+
+  $('#task_peak_detection_method').change(function() {
+	  
+	  if($('#task_peak_detection_method').val() == 1)
+	  {
+	    $('#task_ppm__row').slideUp();
+	    $('#task_max_peak_width__row').slideUp();
+	    $('#task_min_peak_width__row').slideUp();
+	    $('#task_step_size__row').slideDown();
+	    $('#task_fwhm__row').slideDown();  
+          }
+	  else if( $('#task_peak_detection_method').val() == 0)
+	  {
+	    $('#task_step_size__row').slideUp();
+	    $('#task_fwhm__row').slideUp();  
+	    $('#task_ppm__row').slideDown();
+	    $('#task_max_peak_width__row').slideDown();
+	    $('#task_min_peak_width__row').slideDown();
+
+	  }
+
+  });
+
+  $('#task_alignment_method').change(function() {
+	  
+	  if($('#task_alignment_method').val() == 0)	
+	  {
+            $('#task_mzwid__row').slideDown();
+            $('#task_minfrac__row').slideDown();
+            $('#task_bw__row').slideDown();
+
+	  }
+	  else if($('#task_alignment_method').val() == 1)
+	  {
+            $('#task_mzwid__row').slideUp();
+            $('#task_minfrac__row').slideUp();
+            $('#task_bw__row').slideUp();
+
+	  }
+	  else if($('#task_alignment_method').val() == 2)
+	  {
+
+            $('#task_mzwid__row').slideUp();
+            $('#task_minfrac__row').slideUp();
+            $('#task_bw__row').slideUp();
+	  }
+  });
+
+  $('#task_retention_time_method').change(function() {
+      if ( $('#task_retention_time_method').val() == 0)
+      {
+         $('#task_peak_groups_method__row').slideDown();
+     }
+      else if ( $('#task_retention_time_method').val() == 1)
+      {
+         $('#task_peak_groups_method__row').slideUp();
+      }
+  });
+
+  
+  
+
+
+});
+</script>
+<div class="alert alert-info"> Submit the process. We'll inform you as soon as it is done</div>
+<BR>
+<BR>
+{{=form}}

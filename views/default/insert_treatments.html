@@ -1,0 +1,10 @@
+{{extend 'layout.html'}}
+<center>
+
+
+<table border='1'><tr><td>SAMPLE NAME</td><td><b>{{=samp.name}}</b></td><td></td><td>SAMPLE CODE</td><td><b>{{=samp.code}}</b></td></tr></table></center>
+<h4>TREATMENTS</h4>
+{{request.args.append('clear')}}
+<INPUT type="button" class="btn btn-success" value="Clear Form"
+onclick="location.href='{{=URL('insert_treatments',args=request.args)}}'"/>
+{{=form}}

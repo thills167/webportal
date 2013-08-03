@@ -1,0 +1,175 @@
+{{extend 'layout.html'}}
+<style>
+ .down {
+  position:absolute;
+  left:390px;
+}
+ .down.muted {
+  position:absolute;
+  left:440px;
+}
+</style>
+<script>
+  $(document).ready(function() {
+		  $('#secret').click( function() {
+			 $('.collapse').collapse('toggle'); });
+
+});
+</script>
+<h4><abbr title="Sample Name">{{=sample.name}}</abbr>  <small>created by {{=A(user.first_name+' ' +user.last_name,_href=URL('user_viewer',args=sample.experimentalist))}}</small>
+<span class="label label-info">{{='Published' if sample.publication_status == 1 else 'Not Published'}}</span>
+<span class="label label-success">{{='In Progress' if sample.working_status == 1 else 'Completed'}}</span>
+<span class="label label-warning">
+{{if sample.replica == 'Original':}}
+{{='original'}}
+{{elif sample.replica == 'replicate':}}
+{{='replicate'}}
+{{elif sample.replica == 'aliqout':}}
+{{='aliquot'}}
+{{pass}}
+</span>
+</small></h4>
+
+<dl class="dl-horizontal">
+<dt>Sample Code</dt>
+<dd>{{=sample.code}}</dd>
+<dt>Description</dt>
+<dd>{{=sample.description}}</dd>
+<dt>Group</dt>
+<dd>{{=grouping.name}}<dd>
+<dt>Scientific Name</dt>
+<dd>{{=I(sample.scientific_name)}}<dd>
+</dl>
+<span class="pull-right">
+<i class="icon-wrench"></i>
+<button type="button" class="btn btn-primary label" id="secret">collapse/toggle all </button>
+</span>
+<hr>
+<span>
+<span class=""><b>BIO-Source </b></span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#biosource"> <i class="icon-chevron-down icon-white"></i></button>
+<small class="muted down"> {{=len(biosource)}} record(s) found </small>
+</span>
+
+<div id="biosource" class="collapse in">
+{{for each in biosource_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+<hr>
+<span>
+<span class=""><b>Plant Growth Condition </b></span>
+<button  class="btn btn-primary down" data-toggle="collapse" data-target="#pgcondition"><i class="icon-chevron-down icon-white"></i></button>
+<small class="muted down"> {{=len(plant_growth)}} record(s) found </small>
+</span>
+<hr>
+<div id="pgcondition" class="collapse in">
+{{for each in pgc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+
+<span>
+<span class=""><b>Treatment</b></span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#treatment"> <i class="icon-chevron-down icon-white"></i> </button>
+<small class="muted down"> {{=len(treatment)}} record(s) found </small>
+</span>
+
+<div id="treatment" class="collapse in">
+{{for each in treatment_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+<hr>
+
+
+<span>
+<span class=""><b>Harvest</b> </span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#harvest"> <i class="icon-chevron-down icon-white"></i> </button>
+<small class="muted down"> {{=len(harvest)}} record(s) found </small>
+</span>
+
+<hr>
+<div id="harvest" class="collapse in">
+{{for each in harvest_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+<span>
+<span class=""><b>Gas Chromatography</b> </span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#gc"> <i class="icon-chevron-down icon-white"></i> </button>
+<small class="muted down"> {{=len(gc)}} record(s) found </small>
+</span>
+
+<div id="gc" class="collapse in">
+{{for each in gc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+<hr>
+
+
+<span>
+<span class=""><b>Liquid Chromatorgraphy</b> </span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#lc"> <i class="icon-chevron-down icon-white"></i></button>
+<small class="muted down"> {{=len(lc)}} record(s) found </small>
+</span>
+
+<div id="lc" class="collapse in">
+{{for each in lc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+<hr>
+
+<span>
+<span class=""><b> Mass Spectroscopy</b></span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#ms"> <i class="icon-chevron-down icon-white"></i></button>
+<small class="muted down"> {{=len(ms)}} record(s) found </small>
+</span>
+
+<div id="ms" class="collapse in">
+{{for each in ms_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+<hr>
+
+<span>
+<span class=""><b> Raw Data Storage Information</b> <span>
+<button type="button" class="btn btn-primary down" data-toggle="collapse" data-target="#raw"> <i class="icon-chevron-down icon-white"></i></button>
+<small class="muted down"> {{=len(raw_storage)}} record(s) found </small>
+</span>
+
+<div id="raw" class="collapse in">
+{{for each in raw_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>

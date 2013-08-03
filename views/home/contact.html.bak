@@ -1,0 +1,45 @@
+{{extend 'layout1.html'}}
+<div id="welcome">
+		<div class="entry">
+			<table width="100%" border=4>
+				<tr>
+					<td><address style="text-align: center; color: black">
+					<span style="font-weight: bold">Dr. Indira Ghosh</span><br>
+					Dean, Professor<br>	
+					School of Informatics technology <br>
+					JNU, New Delhi<br>
+					Email: indirag@mail.jnu.ac.in  <br>
+					<a href="http://www.jnu.ac.in/Faculty/Indira/">Personal Home Page</a>
+					</address></td>				
+
+					<td><address style="text-align: center; color: black">
+					<span style="font-weight: bold">Dr. Abhijit Mitra</span><br>
+					Professor<br>	
+					CCNSB, IIIT Hyderabad<br>
+					Ph: 040- 6653 1000 Ext: 1171 <br>
+					Email: abi_chem@iiit.ac.in <br>
+					<a href="http://www.iiit.ac.in/~abi_chem/">Personal Home Page</a>
+					</address></td>
+				</tr>
+				<tr>
+					<td><address style="text-align: center; color: black">
+					<span style="font-weight: bold">Dr. Nita Parekh</span><br>
+					Associate Professor<br>	
+					CCNSB, IIIT Hyderabad <br>
+					Ph: 040- 6653 1000 Extn: 1183 <br>
+					Email: nita@iiit.ac.in <br>
+					<a href="http://faculty.iiit.ac.in/~nita">Personal Home Page</a>
+					</address></td>
+
+					<td><address style="text-align: center; color: black">
+					<span style="font-weight: bold">Dr. Vikram Pudi</span><br>
+					Associate Professor<br>	
+					CDE, IIIT Hyderabad <br>
+					Ph: 040- 6653 1000 Extn: 1191 <br>
+					Email: vikram@iiit.ac.in <br>
+					<a href="http://faculty.iiit.ac.in/~vikram">Personal Home Page</a>
+					</address></td>
+				</tr>
+			</table>
+		</div>
+</div>

@@ -1,0 +1,23 @@
+{{extend "layout.html"}}
+<form class="navbar-form pull-right">
+{{=form}}
+<form>
+{{if auth.user:}}
+{{if authenticated=='yes':}}
+  {{=(B(A(' Add New Project',_href=URL('add_project'))))}}
+{{pass}}
+{{pass}}
+<h4>List of All Published Projects  </h4>
+<ol>
+{{for project in pub_projects:}}
+  {{=LI(B( A(project.project.name,_href=URL('project_viewer',args=project.project.id))),BR(),B("Project Code : "+project.project.code),BR(),(A(" Coordinator: " + project.auth_user.first_name,_href=URL('user_viewer',args=project.project.project_coordinator))))}}
+{{pass}}
+</ol>
+{{if auth.user:}}
+<h4>List of All Unpublished Projects </h4>
+<ol>
+   {{for project in dev_projects:}}
+      {{=LI(B( A(project.project.name,_href=URL('project_viewer',args=project.project.id))),BR(),B("Project Code : "+project.project.code),BR(),(A(" Coordinator: " + project.auth_user.first_name,_href=URL('user_viewer',args=project.project.project_coordinator))))}}
+   {{pass}}
+{{pass}}
+</ol>

@@ -1,0 +1,60 @@
+{{extend 'layout1.html'}}
+<script src="http://ajax.microsoft.com/ajax/jquery/jquery-1.4.2.js" type="text/javascript"></script>
+        <script type="text/javascript">
+$(function()
+{
+
+	var adjustheight = 80;
+	var moreText = "More...";
+	var lessText = "Less";
+
+	$(".more-less .more-block").css('height', adjustheight).css('overflow', 'hidden');
+	$(".more-less").append('<p class="continued"></p><a href="#" class="adjust"></a>');
+	$("a.adjust").text(moreText);
+	$(".adjust").toggle(function() 
+	{
+		$(this).parents("div:first").find(".more-block").css('height', 'auto').css('overflow', 'visible');
+		$(this).parents("div:first").find("p.continued").css('display', 'none');
+		$(this).text(lessText);
+	}, 	function() 
+   		{
+   			$(this).parents("div:first").find(".more-block").css('height', adjustheight).css('overflow', 'hidden');
+			$(this).parents("div:first").find("p.continued").css('display', 'block');
+			$(this).text(moreText);
+    		});
+});
+</script>
+<div id="welcome">
+		<p><span style="font-weight:bold">Computational Core for Plant metabolomics (CCPM)</span> presently being developed at IIIT Hyderabad, is a joint venture with JNU, Delhi and is funded by the Department of Biotechnology (DBT), government of India. The major goal of this project is to create a national computational infrastructure to support a collaborative initiative on Plant Metabolomics by developing metabolomic LIMS, metabolomic database,  spectral analysis tools for metabolomics and metabolic modeling. Thus there are two associated goals. One of them relates to the identification and structure elucidation of metabolites based on spectroscopic data: biological and chemical data integration. The other relates to bioinformatics and pathway modeling. The architecture for LIMS has been designed as per international Metabolomics Standards Initiative (MSI).</p>
+</div>
+	<div id="three-columns">
+		<div id="column1">
+			<h2>LIMS</h2>
+			<p><img src="http://web.iiit.ac.in/~priyaranjan.kumar/CCPM/lims.jpg" width="330" height="120" alt="" /></p>
+			<div class="more-less">
+    				<div class="more-block">
+					<p>Laboratory information management System (LIMS) is essentially a computer software that can be used in the laboratory for the management of samples, laboratory users, instruments, standards, workflow automation and other laboratory functions.</p>
+				</div>
+			</div>
+		</div>
+	
+		<div id="column2">
+			<h2>Tools</h2>
+			<p><img src="http://tecnofrom.com/moduloProductos/noti_32/mediana1.jpg" width="330" height="120" alt="" /></p>
+			<div class="more-less">
+    				<div class="more-block">
+					<p>With metabolic profiling as well as metabolic fingerprinting identified as tasks by metabolomic researchers, we need to customize/develop tools for spectral analysis.</p>
+				</div>
+			</div>
+		</div>
+	
+		<div id="column3">
+			<h2>Metabolic Modelling</h2>
+			<p><img src="http://web.iiit.ac.in/~priyaranjan.kumar/CCPM/modelling1.png" width="330" height="120" alt="" /></p>
+			<div class="more-less">
+    				<div class="more-block">
+					<p>Metabolic modeling is the key step towards gaining necessary biological insight and towards providing clear perspective on the underlying biological causes for the different metabolic profiles that are deduced computationally. Traditionally metabolic modeling is carried out by solving systems of time dependent ordinary differential equations that describe the chemical reaction and reaction rates of the metabolic systems of interest. In the recent years, one of the most popular approaches is constraint-based metabolic modeling known as flux-balance analysis or FBA. We intend to implement FBA, in conjunction with the metabolomic data analysis for initiating detailed metabolic modeling for plants.</p>
+				</div>
+			</div>
+		</div>
+	</div>

@@ -1,0 +1,380 @@
+(dp1
+S'output'
+p2
+S'<type \'exceptions.SyntaxError\'> invalid table "biosource" attributes: set([\'comment\'])'
+p3
+sS'layer'
+p4
+S'/home/www-data/web2py/applications/prototype/models/db.py'
+p5
+sS'code'
+p6
+S"\xef\xbb\xbf#s scaffolding model makes your app work on Google App Engine too\n## File is released under public domain and you can use without limitations\n#########################################################################\n\n## if SSL/HTTPS is properly configured and you want all HTTP requests to\n## be redirected to HTTPS, uncomment the line below:\n# request.requires_https()\n\nif not request.env.web2py_runtime_gae:\n    ## if NOT running on Google App Engine use SQLite or other DB\n    db = DAL('sqlite://storage.sqlite')\nelse:\n    ## connect to Google BigTable (optional 'google:datastore://namespace')\n    db = DAL('google:datastore')\n    ## store sessions and tickets there\n    session.connect(request, response, db = db)\n    ## or store session in Memcache, Redis, etc.\n    ## from gluon.contrib.memdb import MEMDB\n    ## from google.appengine.api.memcache import Client\n    ## session.connect(request, response, db = MEMDB(Client()))\n\n## by default give a view/generic.extension to all actions from localhost\n## none otherwise. a pattern can be 'controller/function.extension'\nresponse.generic_patterns = ['*'] if request.is_local else []\n## (optional) optimize handling of static files\n# response.optimize_css = 'concat,minify,inline'\n# response.optimize_js = 'concat,minify,inline'\n\n#########################################################################\n## Here is sample code if you need for\n## - email capabilities\n## - authentication (registration, login, logout, ... )\n## - authorization (role based authorization)\n## - services (xml, csv, json, xmlrpc, jsonrpc, amf, rss)\n## - old style crud actions\n## (more options discussed in gluon/tools.py)\n#########################################################################\n\nfrom gluon.tools import Auth, Crud, Service, PluginManager, prettydate\nauth = Auth(db, hmac_key=Auth.get_or_create_key())\ncrud, service, plugins = Crud(db), Service(), PluginManager()\n\n## create all tables needed by auth if not custom tables\n\ndb.define_table('affiliation',\n\t\tField('name','string',required=True,requires=IS_NOT_EMPTY()),\n\t\tField('description','text',required=True),format='%(name)s')\n\n\nauth.settings.extra_fields['auth_user'] = [\n     Field('title',notnull=True,required=True,requires=IS_IN_SET({'0':'Mr','1':'Mrs','2':'Ms','3':'Prof','4':'Dr'}),label = 'Salutation'),\n     Field('position',notnull=False,label='Positon',required=True,requires=IS_IN_SET({'0':'Post Doctoral Fellow','1':'Scientist','2':'Post Graduate/Phd student','3':'Under Graduate','4':'Faculy/Project Co-ordinator'})),\n#     Field('middle',notnull=False,required=False,label='Middle Name'),\n     Field('affiliated_to',requires=IS_NOT_EMPTY(),label = 'Affiliation'),\n     Field('address','text', label='Postal Address',required=True,requires = IS_NOT_EMPTY()),\n     Field('city',notnull=False,required=True,requires=IS_NOT_EMPTY(),label = 'City'),\n     Field('country',notnull=True,required=True,requires=IS_NOT_EMPTY(),default = 'India',label = 'Country'),\n     Field('postal_code',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Postal Code'),\n     Field('phone',label = 'Telephone Number'),\n     Field('mobile',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Mobile Number')\n     #Field('registration_at',notnull=False,required=False,requires=IS_IN_SET({'0':'IIIT Hyderabad','1':'JNU Delhi'}),label ='Registration at',comment='centre you wish to attend for the workshop')\n]\n\t\n#auth.define_tables(username=True)\nauth.define_tables()\n\n## configure email\nmail=auth.settings.mailer\nmail.settings.server = 'mail.iiit.ac.in:25'\nmail.settings.sender = 'metabolomics@iiit.ac.in'\n#mail.settings.login = 'username:password'\n\n## configure auth policy\nauth.settings.registration_requires_verification = False\nauth.settings.registration_requires_approval = False\nauth.settings.reset_password_requires_verification = False\n\nauth.messages.verify_email = 'Click on the link http://metabolomics.iiit.ac.in/module_1_modified/default/user/verify_email'+'/%(key)s to verify your email'\n\n## if you need to use OpenID, Facebook, MySpace, Twitter, Linkedin, etc.\n## register with janrain.com, write your domain:api_key in private/janrain.key\nfrom gluon.contrib.login_methods.rpx_account import use_janrain\nuse_janrain(auth,filename='private/janrain.key')\n\n#########################################################################\n## Define your tables below (or better in another model file) for example\n##\n## >>> db.define_table('mytable',Field('myfield','string'))\n##\n## Fields can be 'string','text','password','integer','double','boolean'\n##       'date','time','datetime','blob','upload', 'reference TABLENAME'\n## There is an implicit 'id integer autoincrement' field\n## Consult manual for more options, validators, etc.\n##\n## More API examples for controllers:\n##\n## >>> db.mytable.insert(myfield='value')\n## >>> rows=db(db.mytable.myfield=='value').select(db.mytable.ALL)\n## >>> for row in rows: print row.id, row.myfield\n#########################################################################\nimport datetime\nnow = datetime.datetime.now()\ntoday_date = datetime.datetime.today() \n\nrole_list = ['investigator','co_investigator','collaborator','analyst','experimentalist','member','project_coordinator']\n\nT.force('en-de')\n\ndb.define_table('project',\n     Field('name',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.name'),label='Project Name'),\n     Field('code',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.code'),label='Project Code'),\n     Field('start_date','date',default=today_date,notnull=True,required=True,requires=IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),\n     Field('project_coordinator','reference auth_user'),\n     Field('project_description','text',required = True,requires= IS_NOT_EMPTY(),label='Brief Description of Experiment/Project'),\n     #Field('project_description_upload','upload',label='Or upload'),\n     Field('project_status',notnull=True,default='0',requires=IS_IN_SET({'0':'Development','1':'Published'})),\n     Field('project_literature_reference','integer',label='Literature Reference Pubmed ID (Any relevant published Document)'),\n     Field('project_journal_name','string',label='Already Published Work'),\n     Field('project_publication_date','date',writable=False,readable=False,required=False),\n     \n     #Field('project_pubmed_id','string',label='PubMed ID'),\n     format='%(name)s')\n\n\ndb.define_table('role',\n     Field('user','reference auth_user'),\n     Field('project','reference project'), \n     Field('role',notnull=True,required=True,requires=IS_IN_SET({'0':'Investigator','1':'Co-Investigator','2':'Collaborator','4':'Experimentalist'})),\n     Field('approval_status',notnull=True,requires=IS_IN_SET({'0':'Pending','1':'Approved','2':'Blocked'})),\n     Field('member_since',readable=False,writable=False,notnull=True,required=True,default=request.now))\n#recent = db(db.role.user>now-datetime.timedelta(10))\n#db.role.user.requires = IS_NOT_IN_DB(db,'role.user','role.role','role.project')\n \n#the user and code and required time should be not null , required ..  \n#added project field to sync with db.insert in controller\ndb.define_table('sample',\n    Field('parent','reference sample',writable=False),\n    Field('experimentalist','reference auth_user',writable=False),\n   # Field('analyst','reference auth_user'),\n    Field('name',notnull=True,required=True,label='Sample Name'),\n    Field('code',required=True,label='Sample Code'),\n    #requires=IS_NOT_IN_DB(db,'sample.code'),\n    Field('description','text',length=2000,label='Sample Description'),\n   # Field('project','reference project'),\n    Field('scientific_name','string'),\n    Field('experiment','reference experiment',writable=False),\n    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),\n    Field('replica',default='Original',required=True,requires=IS_IN_SET(['Original','replicate','aliquot']),label='Type'),\n    Field('publication_status','boolean',default=False,required=True,label='Pub?'),format='%(name)s',singular='Sample',plural='Samples')\n\n\ndb.define_table('template',\n    Field('user',unique=True,),\n    Field('sample','reference sample'))\n\ndb.define_table('experiment',\n    Field('experimentalist','reference auth_user'),\n   # Field('analyst','reference auth_user'),\n    Field('name',unique=True,notnull=True,required=True,label='Experiemnt Name'),\n    Field('code',required=True,requires=IS_NOT_IN_DB(db,'experiment.code'),label='Experiment Code'),\n    Field('description','text',length=2000,notnull=True,required=True,label='experiment Description'),\n    Field('project','reference project',writable=False),\n    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),\n    Field('publication_status','boolean',default=False,required=True,label='Published'),format='%(name)s',singular='experiment/group',plural='Experiments/Groups')\n\ndb.define_table('project_meta',\n   Field('project','reference project'),\n   Field('enitity','reference entity'))\n\n#bio tables\n\n#schema changes - plant_type (Inbred,Hybrid,Complete) is added \n\n# 2.1 \ndb.define_table('biosource',\n    Field('sample_name','reference sample',writable = False),\n    Field('species_name','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_echotype','string',label='Echotype/Background',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_pedigree_information','string',label='Pedigree Information',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_plant_type','string',label='Plant Type',required=True,notnull=True,requires=IS_IN_SET({'Transgenic Type','Mutant Type','Wild Type'})),\n    Field('plant_type','string',requires=IS_IN_SET({'0':'Inbred','1':'Hybrid','2':'Composite'})),\n    Field('Source_of_germplasm','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_gene_names','string',label='Gene Name(s)',required=True,notnull=True),\n#Field('geno_gene_name',)\n    \n    Field('organ' ,'string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('organ_spec','string',label='Organ Specification',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='Name or description of specific part of organ if any used for the study'),\n    Field('cell_type','string',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment = 'Specific plant cells used after dissection or cell sorting or any other method. This naming should be used based on Plant Ontology Consortium (POC)'),\n    Field('sub_cell_location','string',label='Sub Cellular Location',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='This is about sub cellular locations from cells are collected for experiment. Naming should be maintained based on Gene Ontology Cellular Component'),\n    Field('bio_source_amount','string',label='BioSource Amount',required=True,notnull=True,requires=IS_NOT_EMPTY()),singular = 'Biosource',plural = 'Biosource',comment='This is reference to the mass (mg fresh weight or mg dry weight), number of cells or other measurable quantification information')\n\n\n\n#schema changes - date est other has been changed from date to text and the label has been changed\n\ndb.define_table('plant_growth_condition',\n    Field('sample_name','reference sample', writable = False),\n    Field('growth_soil','string',label='Soil (type, supplier)',),\t\t\n    Field('growth_agar','string',label='Agar (type, supplier)',),\t\t\n    Field('growth_vermiculite','string',label='Vermiculite (type, supplier)',),\t\t\n    Field('growth_hydroponic','string',label='Hydroponic system (type,supplier,nutrient concentrations)',),\t\t\n    Field('growth_cell_culture','string',label='Cell culture (media, volume,cell number per volume)',),\n    Field('loc_field_location','string',label='Location',),\t\n    Field('loc_field_avr_humidity','string',label='Average Humidity',),\n    Field('loc_field_avr_temp','string',label='Average Temperature',),\n    Field('loc_field_avr_rain','string',label='Average Rain Fall',),\n    Field('season','string'),\n    Field('Climate_chamber_size','string',label='Climate chamber size (m3)',),\n    Field('Climate_chamber_co2_concentration','string'),\n    Field('loc_green_location','string',label='Location',),\t\t\n    Field('loc_green_light','string',label='Light (quality,source mode/type,intensity, luminescence period(hr.),dark period (hr.))',),\t\t\n    Field('loc_green_humidity','string',label='Humidity (day,night)',),\n    Field('loc_green_temperature','string',label='Temperature (day,night)',),\t\t\n    Field('loc_green_water','string',label='Water Regime (Amount, time per day) ',),\n    Field('Growth_Protocol_Description','text',label='Growth Protocol Description'),\t\n    Field('growth_protocol_description_upload','upload',label='or'),\t\n    Field('Growth_Plot_Design','text',label='Growth Plot Design',),\t\t\n    Field('nutr_amount','string',label='Nutrient Amount',),\t\t\n    Field('nutr_duration','string',label='Duration',),\t\t\n    Field('nutr_add_info','text',label='Additional information',),\n    Field('sowing_period','string'),\n#,required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!',))),\t\t\n    Field('gerrminating_period','string'),\n#,label='Date of Germination',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\n    Field('date_est_transplanting','string'),\n#,label='Date of Transplanting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\n    Field('date_est_cutting','string'),\n#,label='Date of cutting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\t\t\n    Field('date_est_grafting','string'),\n    Field('hydroponic_type','string'),\n    Field('hydroponic_supplier','string'),\n    Field('hydroponic_nutrient_concentration','string'),\n    Field('hydroponic_volume','string'),\n    Field('hydroponic_number_of_plats','string',label='No. of plats/tray or container'),\n    Field('hydroponic_frequency','string',label='frequency of nutrient changed'),\n    Field('hydroponic_aeration_provided','boolean'),\n    \n#,label='Date of Grafting ',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\t\n    Field('date_est_other','string',label='Additional Information (Stages etc)',required=False),\t\n    Field('other_spec','string',label='Other Specific Metadata'),\t\n    Field('other_spec_upload','upload',label='or'),singular = 'Plant Growth Condition',plural = 'Growth'\n    ) \n\n\ndb.define_table('treatments',\n    Field('sample_name','reference sample', writable = False),\n    Field('treament_biotic_factor','string',label='Biotic'),\n    Field('treatment_abiotic_factor','string',label='Abiotic'),\n    Field('treatment_intervention','string',label='Intervention'),\n    Field('treatment_dose','string',label='Treatment Dose/Intensity levels'),\n    Field('treatment_start_date','date',required=False,requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('treatment_time_duration','string',label='Treament Time(Duration)'),\n    Field('treatment_time','string'),\n    Field('treatment_time_interval','string'),\n    Field('treatment_description','text'),\n    Field('treatment_before_harvest','string',label='Treatment duration before harvest'),singular = 'Treatments',plural = 'Treatments')\n#2.4\n#schema changes - additional comments field is added for harvest amount \n\ndb.define_table('harvests',\n    Field('sample_name','reference sample', writable = False),\n    Field('harvest_date','date',label='Harvest Date(YYYY-MM-DD)',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('harvest_time','time',label='Harvest Time(HH:MM:SS)',requires=IS_EMPTY_OR(IS_TIME())),\n    Field('plant_growth_stage','string',label='plant growth stage/developmental stage'),\n    Field('metalbolism_quenching_method','text',length=2000),\n    Field('harvest_method','text'),\n    Field('harvest_amount','string',label='Harvest Amount(in grams)'),\n    Field('harvest_amount_comment','text'),\n    Field('harvest_storage_location','string'),\n    Field('sample_storage_description','text',label='Storage Description'),\n    Field('sample_storage_date','date',label='Storage Date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('sample_storage_location','string',label='Storage location'),\n    Field('sample_storage_temparature','string',label='Storage Temperature'),singular= 'Harvest',plural='Harvests')\n\n\n#seperate table for 2.6 to 2.7 since they are multivalued attributes for a sample\n\n\ndb.define_table('extraction_preparation',\n\t\tField('sample_name','reference sample', writable = False),\n\t\tField('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n\t\tField('sample_extraction_date','date',required=False,requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n                Field('harvest_stage','string'),\n                Field('amount_of_sample_taken','string'),\n\t\tField('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n\t\tField('extraction_solvent','text',length=1000),\n\t\tField('extraction_protocol','text'),\n                Field('extraction_protocol_name','text',label='name of protocol/Method'),\n\t\tField('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n\t\tField('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n\t\tField('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n                Field('storage_description','text',length=5000),\n\t\tField('storage_location','text',length=1000),\n\t\tField('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n\t\tField('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n\t\tField('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n                Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n\t\tField('storage_condition','text',length=1000),\n\t\tField('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),singular='Extr Preparation',plural='Extr Preparation')\n\n\n\n#3.1.1 GC\ndb.define_table('gas_chromatography',\n    Field('sample_name','reference sample', writable = False),\n    Field('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n    Field('sample_extraction_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n    Field('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n    Field('extraction_solvent','text',length=1000),\n    Field('extraction_protocol','text'),\n    Field('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n    Field('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n    Field('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n    Field('storage_description','text',length=5000),\n    Field('storage_location','text',length=1000),\n    Field('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n    Field('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n    Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_condition','text',length=1000),\n    Field('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),\n#GC\n    Field('instrument_manufacturer','string',label='Manufacturer'),\n    Field('instrument_model_name','string',label='Model name/number'),\n    Field('instrument_software_package','string',label='Software package'),\n    Field('instrument_version_number_or_date','string',label='Version number or Date'),\n#3.1.2 GC\n    Field('sample_phase','string',requires=IS_EMPTY_OR(IS_IN_SET(['polar','non-polar']))),\n    Field('derivatization_method','string',label='Method'),\n    Field('reagents_used_for_derivation','string',label='Reagents used for Derivatization'),\n    Field('derivatization_temperature','string',label='Derivatization temperature (in degree centigrade)'),\n    Field('derivatization_duration','string',label='Duration(in min)'),\n#3.1.3\n    Field('injector_model','string',label='Injector model/type'),\n    Field('injector_software_version','string',label='Software version'),\n    Field('method_name','text',label='Method name (used for sample injection)'),\n    Field('injection_volume','string'),\n    Field('wash_cycles','string',label='Wash cycles(volumes)'),\n    Field('solvent','string'),\n    Field('sample_size','string',label='Sample size/concentration'),\n#3.1.41\n    Field('column_manufacturer','string',label='Manufacturer'),\n    Field('product_name_and_catalogue_number_of_column','string',label='Product Name and catalogue number (year of catalogue)'),\n    Field('stationary_media_composition','string',requires=IS_NOT_EMPTY()),\n    Field('internal_diameter_of_column','string'),\n    Field('length_of_column','string'),\n    Field('column_temperature_program','text'),\n    Field('column_head_pressure','string',label='Column head pressure(in psi)'),\n    Field('flow_rate','double',label='Flow rate(in mL/min)'),\n#3.1.5\n    Field('seperation_method_name','string',label='Method name'),\n    Field('injector_temperature','string',label='Injector tempreature(in degree*c)'),\n    Field('split_splitless_mode','string',requires=IS_EMPTY_OR(IS_IN_SET({'0':'Split mode','1':'Splitless mode'})),label='Split or splitless mode'),\n    Field('split_ratio','string'),\n    Field('mobile_phase_composition','text'),\n    Field('mobile_phase_flow_rate','double',label='Mobile phase flow rate(in ml/min)'),\n    Field('thermal_gradient_profiles','text',length='1000'),\n\n#3.1.6\n    Field('validation_sample','string'),\n    Field('internal_standards','string'),\n    Field('chromatographic_resolution','string'),\n    Field('cycle_per_column','integer'),\n    Field('cycle_per_injector','integer'),\n    Field('cycle_per_septum','string'),\n    Field('cycle_per_blank','integer'),\n#3.1.7\n    Field('SOP_protocol_name','string'),\n    Field('date_of_analysis','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('operator','reference auth_user'),\n    Field('deviation_from_SOP','text',length=1000),\n    Field('publication_refernce','text',length=1000,label='Publication reference(If any)'),plural='GC')\n\n#LC\ndb.define_table('liquid_chromatography',\n    Field('sample_name','reference sample', writable = False),\n    Field('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n    Field('sample_extraction_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n    Field('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n    Field('extraction_solvent','text',length=1000),\n    Field('extraction_protocol','text'),\n    Field('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n    Field('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n    Field('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n    Field('storage_description','text',length=5000),\n    Field('storage_location','text',length=1000),\n    Field('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n    Field('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n    Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_condition','text',length=1000),\n    Field('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),\n#LC    \n    Field('instrument_manufacturer','string',label='Manufacturer'),\n    Field('instrument_model_name_ornumber','string',label='Model name/number'),\n    Field('instrument_software_package','string',label='Software package'),\n    Field('instrument_version_number_or_date','string',label='Version number or Date'),\n#3.1.3\n    Field('injector_model','string',label='Injector model/type'),\n    Field('injector_software_version','string',label='Software version'),\n    Field('method_name','text',label='Method name (used for sample injection)'),\n    Field('injection_volume','string'),\n    Field('wash_cycles','string',label='Wash cycles(volumes)'),\n    Field('solvent','string'),\n    Field('sample_size_or_concentration',label='Sample size/concentration'),\n#3.1.41\n    Field('column_manufacturer','string',label='Manufacturer'),\n    Field('product_name_and_catalogue_number_of_column','string',label='Product Name and catalogue number (year of catalogue)'),\n    Field('stationary_media_composition','string'),\n    Field('internal_diameter_of_column','string'),\n    Field('length_of_column','text'),\n    Field('column_temperature_program','text'),\n    Field('column_head_pressure','double',label='Column head pressure(in psi)'),\n    Field('flow_rate','double',label='Flow rate(in mL/min)'),\n#3.1.5\n    Field('seperation_method_name','string',label='Method name'),\n    Field('injector_temperature','string',label='Injector tempreature(in degree*c)'),\n    Field('split_splitless_mode','string',requires=IS_EMPTY_OR(IS_IN_SET(['Split mode','Splitless mode'])),label='Split or splitless mode'),\n    Field('split_ratio','string'),\n    Field('mobile_phase_composition','text'),\n    Field('mobile_phase_flow_rate','double',label='Mobile phase flow rate(in ml/min)'),\n    Field('solvent_gradient_profiles','text',length='1000'),\n#3.1.6\n    Field('validation_sample','string'),\n    Field('internal_standards','string'),\n    Field('chromatographic_resolution','string'),\n    Field('cycle_per_column','integer'),\n    Field('cycle_per_injector','integer'),\n    Field('cycle_per_septum','string'),\n    Field('cycle_per_blank','integer'),\n#3.1.7\n    Field('SOP_protocol_name','string'),\n    Field('date_of_analysis','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('operator','reference auth_user'),\n    Field('deviation_from_SOP','text',length=1000),\n    Field('publication_refernce','text',length=1000,label='Publication reference'),plural='LC')\n\n# main table for  3.2 \ndb.define_table('mass_spectroscopy',\n\n# table 3.2.1\n     Field('sample_name','reference sample', writable = False),\n     Field('manufacturer','string',),    \n     Field('model','string',),    \n     Field('oper_soft_name','string',label='operational software name ',),    \n     Field('oper_soft_ver','string',label='operational software version',),   \n\n# table 3.2.2\n     Field('ionization_mode','string',required=False),    \n     Field('polarity','string',required=False),    \n     Field('vaccum_pressure','string'),    \n     Field('len_voltages','string',label=' skimmer/focusing lens voltages '),    \n     Field('gas_flows','string'),    \n     Field('sour_temp','string',label='source temperature'),    \n\n      \n# table 3.2.3\n     Field('type_of_analyzer','string'),    \n     Field('m_range','string',label='m/z_range'),    \n     Field('calibration_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),    \n     Field('resolution1','string',label='resolution'),    \n     Field('mass_accuracy1','string',label='mass accuracy'),    \n     Field('log_program','string',label='logic program for data acquistion'),    \n     Field('spectral_acquisition_rate','string'),    \n     Field('vaccum_pressure','string'),    \n     Field('concentration','string'),    \n     Field('lock_mass','string'),    \n     Field('flow_rate','string'),    \n     Field('frequency','string'),    \n     Field('add_info','text',label='additional information '),\n\n\n# table 3.2.4\n     Field('tune','string'),\n     Field('sensitivity','string'),\n     Field('mass_accuracy2','string',label='mass accuracy'),\n     Field('resolution2','string',label='resolution'),\n\n      \n# table 3.2.5\n     Field('SOP_protocol','text'),\n     Field('date_of_data_acquistion','date'),\n     Field('operator','string'),\n     Field('data_acquisition_rate','string'),\n     \n     Field('deviation_from_SOP','string'),\n\n     Field('replicate_sample_analysis','integer'),plural='MS')\n\n\ndb.define_table('spectrophotometry',\n\n# table 3.2.1\n     Field('sample_name','reference sample', writable = False),\n     Field('wavelength','string'),\n     Field('optical_density','string'),\n     Field('Final_concentration_of_compound','string'),plural='SPM')\n\ndb.define_table('raw_data_storage_information',\n    Field('sample_name','reference sample',writable=False),\n    Field('email_id_of_person','string',label='Email id',required=True,requires=IS_EMAIL()),\n    Field('raw_data_file_name','string',label='Raw data file name'),\n    Field('raw_data_file_upload','upload',label='Upload raw data file'),\n    Field('raw_data_standard_format','string',label='Raw data standard format'),\n    Field('raw_data_standard_format_upload','upload',label='Upload converted standard data file'),\n    \n    Field('additional_information_about_data','text',label='Additional information about data'),\n    Field('additional_information_upload','upload',label='Additional data file upload'),\n    Field('date_of_data_upload','date',label='Date of data uploaded',requires=IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())\n    ),plural='RDS')\n\n\ndb.define_table('feedback',\n               Field('feedback_on',required=True),\n               Field('feedback_body','text',required=True,requires=IS_NOT_EMPTY()),\n               Field('feedback_by','reference auth_user',notnull=False))                                                              \n\n\n\n\ndb.define_table('sample_files',\n\t\tField('sample','reference sample',readable=False,writable=False),\n\t\tField('file','upload',label='Additional Sample Data',required=True,notnull=True),\n\t\tField('user','reference auth_user',readable=False,writable=False),\n\t\tField('description','text'),format='%(sample)s')\n\n\ndef name(identifier):\n   ans = db(db.auth_user.id == identifier).select().first()\n   f = str(ans.first_name)+' '+str(ans.last_name)\n   return f\n"
+p7
+sS'snapshot'
+p8
+(dp9
+S'exception'
+p10
+(dp11
+S'__getslice__'
+p12
+S"<method-wrapper '__getslice__' of exceptions.SyntaxError object>"
+p13
+sS'text'
+p14
+S'None'
+p15
+sS'__str__'
+p16
+S"<method-wrapper '__str__' of exceptions.SyntaxError object>"
+p17
+sS'__reduce__'
+p18
+S'<built-in method __reduce__ of exceptions.SyntaxError object>'
+p19
+sS'__dict__'
+p20
+S'{}'
+p21
+sS'__sizeof__'
+p22
+S'<built-in method __sizeof__ of exceptions.SyntaxError object>'
+p23
+sS'__init__'
+p24
+S"<method-wrapper '__init__' of exceptions.SyntaxError object>"
+p25
+sS'__setattr__'
+p26
+S"<method-wrapper '__setattr__' of exceptions.SyntaxError object>"
+p27
+sS'__reduce_ex__'
+p28
+S'<built-in method __reduce_ex__ of exceptions.SyntaxError object>'
+p29
+sS'__new__'
+p30
+S'<built-in method __new__ of type object>'
+p31
+sS'__format__'
+p32
+S'<built-in method __format__ of exceptions.SyntaxError object>'
+p33
+sS'__class__'
+p34
+S"<type 'exceptions.SyntaxError'>"
+p35
+sS'filename'
+p36
+S'None'
+p37
+sS'lineno'
+p38
+S'None'
+p39
+sS'msg'
+p40
+S'\'invalid table "biosource" attributes: set([\\\'comment\\\'])\''
+p41
+sS'__doc__'
+p42
+S"'Invalid syntax.'"
+p43
+sS'__getitem__'
+p44
+S"<method-wrapper '__getitem__' of exceptions.SyntaxError object>"
+p45
+sS'__setstate__'
+p46
+S'<built-in method __setstate__ of exceptions.SyntaxError object>'
+p47
+sS'__getattribute__'
+p48
+S"<method-wrapper '__getattribute__' of exceptions.SyntaxError object>"
+p49
+sS'print_file_and_line'
+p50
+S'None'
+p51
+sS'args'
+p52
+S'(\'invalid table "biosource" attributes: set([\\\'comment\\\'])\',)'
+p53
+sS'__subclasshook__'
+p54
+S'<built-in method __subclasshook__ of type object>'
+p55
+sS'offset'
+p56
+S'None'
+p57
+sS'__unicode__'
+p58
+S'<built-in method __unicode__ of exceptions.SyntaxError object>'
+p59
+sS'__delattr__'
+p60
+S"<method-wrapper '__delattr__' of exceptions.SyntaxError object>"
+p61
+sS'__repr__'
+p62
+S"<method-wrapper '__repr__' of exceptions.SyntaxError object>"
+p63
+sS'__hash__'
+p64
+S"<method-wrapper '__hash__' of exceptions.SyntaxError object>"
+p65
+ssS'evalue'
+p66
+S'invalid table "biosource" attributes: set([\'comment\'])'
+p67
+sS'request'
+p68
+cgluon.html
+XML_unpickle
+p69
+(S's\xfe]\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">ajax</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">application</td><td valign="top">:</td><td><div>prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">args</td><td valign="top">:</td><td><div><table><tr><td><div>1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f08c1cd64c8&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cid</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">client</td><td valign="top">:</td><td><div>10.1.33.94</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">controller</td><td valign="top">:</td><td><div>default</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">SESS1fda454ed642981b513705279fb626ee</td><td valign="top">:</td><td><div>326dq2ka1b30o3u1vq0dng8v37<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SESS23006bdb94524d33f4e709abf1121146</td><td valign="top">:</td><td><div>9rda2bebcjoikcrbf2cis2hku5<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_prototype</td><td valign="top">:</td><td><div>10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">env</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/www-data/web2py/applications/demo/&#x27;, &#x27;/home/www-data/web2py/applications/welcome/&#x27;, &#x27;/home/www-data/web2py/applications/examples/&#x27;, &#x27;/home/www-data/web2py/applications/prototype/&#x27;, &#x27;/home/www-data/web2py/applications/lims_modified/&#x27;, &#x27;/home/www-data/web2py/applications/admin/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">document_root</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gateway_interface</td><td valign="top">:</td><td><div>CGI/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_encoding</td><td valign="top">:</td><td><div>gzip, deflate</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_language</td><td valign="top">:</td><td><div>en-US,en;q=0.5</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_cache_control</td><td valign="top">:</td><td><div>max-age=0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_connection</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_cookie</td><td valign="top">:</td><td><div>SESS23006bdb94524d33f4e709abf1121146=9rda2bebcjoikcrbf2cis2hku5; SESS1fda454ed642981b513705279fb626ee=326dq2ka1b30o3u1vq0dng8v37; session_id_prototype=10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_dnt</td><td valign="top">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_host</td><td valign="top">:</td><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_user_agent</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:19.0) Gecko/20100101 Firefox/19.0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>10.4.3.130</div></td></tr><tr><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>metabolomics</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_application_group</td><td valign="top">:</td><td><div>127.0.1.1|</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_callable_object</td><td valign="top">:</td><td><div>application</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_handler_script</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_input_chunked</td><td valign="top">:</td><td><div>0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_listener_host</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_listener_port</td><td valign="top">:</td><td><div>80</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_process_group</td><td valign="top">:</td><td><div>web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_request_handler</td><td valign="top">:</td><td><div>wsgi-script</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_script_reloading</td><td valign="top">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi_version</td><td valign="top">:</td><td><div><table><tr><td><div>3</div></td></tr><tr><td><div>3</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path_info</td><td valign="top">:</td><td><div>/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path_translated</td><td valign="top">:</td><td><div>/home/www-data/web2py/wsgihandler.py/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">query_string</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_addr</td><td valign="top">:</td><td><div>10.1.33.94</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_port</td><td valign="top">:</td><td><div>40709</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_method</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_uri</td><td valign="top">:</td><td><div>/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">script_filename</td><td valign="top">:</td><td><div>/home/www-data/web2py/wsgihandler.py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">script_name</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_addr</td><td valign="top">:</td><td><div>10.4.3.130</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_admin</td><td valign="top">:</td><td><div>[no address given]</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_name</td><td valign="top">:</td><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_port</td><td valign="top">:</td><td><div>80</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_protocol</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_signature</td><td valign="top">:</td><td><div>&lt;address&gt;Apache/2.2.22 (Ubuntu) Server at metabolomics.iiit.ac.in Port 80&lt;/address&gt;\n</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_software</td><td valign="top">:</td><td><div>Apache/2.2.22 (Ubuntu)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_path</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div><table><tr><td><div>2</div></td></tr><tr><td><div>4</div></td></tr><tr><td><div>2</div></td></tr><tr><td><div>stable</div></td></tr><tr><td><div>datetime.datetime(2013, 3, 4, 3, 26, 21)</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_errors</td><td valign="top">:</td><td><div>&lt;mod_wsgi.Log object at 0x7f08ba3e3e30&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_file_wrapper</td><td valign="top">:</td><td><div>&lt;built-in method file_wrapper of mod_wsgi.Adapter object at 0x7f08ba3c8cd8&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_input</td><td valign="top">:</td><td><div>&lt;mod_wsgi.Input object at 0x7f08ba3e3f70&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_version</td><td valign="top">:</td><td><div><table><tr><td><div>1</div></td></tr><tr><td><div>1</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">extension</td><td valign="top">:</td><td><div>html</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">folder</td><td valign="top">:</td><td><div>/home/www-data/web2py/applications/prototype/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">function</td><td valign="top">:</td><td><div>insert_biosource</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">get_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">global_settings</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/www-data/web2py/applications/demo/&#x27;, &#x27;/home/www-data/web2py/applications/welcome/&#x27;, &#x27;/home/www-data/web2py/applications/examples/&#x27;, &#x27;/home/www-data/web2py/applications/prototype/&#x27;, &#x27;/home/www-data/web2py/applications/lims_modified/&#x27;, &#x27;/home/www-data/web2py/applications/admin/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>10.4.3.130</div></td></tr><tr><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>metabolomics</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div><table><tr><td><div>2</div></td></tr><tr><td><div>4</div></td></tr><tr><td><div>2</div></td></tr><tr><td><div>stable</div></td></tr><tr><td><div>datetime.datetime(2013, 3, 4, 3, 26, 21)</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_https</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_local</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_restful</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">now</td><td valign="top">:</td><td><div>datetime.datetime(2013, 3, 12, 0, 34, 7, 972580)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">post_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_args</td><td valign="top">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_extension</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">url</td><td valign="top">:</td><td><div>/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">utcnow</td><td valign="top">:</td><td><div>datetime.datetime(2013, 3, 11, 19, 4, 7, 972604)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">uuid</td><td valign="top">:</td><td><div>prototype/10.1.33.94.2013-03-12.00-34-07.45237a28-8b9a-465f-9d4a-03b1002f1b4c</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">environ</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">DOCUMENT_ROOT</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">GATEWAY_INTERFACE</td><td valign="top">:</td><td><div>CGI/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_ENCODING</td><td valign="top">:</td><td><div>gzip, deflate</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_LANGUAGE</td><td valign="top">:</td><td><div>en-US,en;q=0.5</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_CACHE_CONTROL</td><td valign="top">:</td><td><div>max-age=0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_CONNECTION</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_COOKIE</td><td valign="top">:</td><td><div>SESS23006bdb94524d33f4e709abf1121146=9rda2bebcjoikcrbf2cis2hku5; SESS1fda454ed642981b513705279fb626ee=326dq2ka1b30o3u1vq0dng8v37; session_id_prototype=10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_DNT</td><td valign="top">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_HOST</td><td valign="top">:</td><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_USER_AGENT</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:19.0) Gecko/20100101 Firefox/19.0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">PATH_INFO</td><td valign="top">:</td><td><div>/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">PATH_TRANSLATED</td><td valign="top">:</td><td><div>/home/www-data/web2py/wsgihandler.py/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">QUERY_STRING</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_ADDR</td><td valign="top">:</td><td><div>10.1.33.94</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_PORT</td><td valign="top">:</td><td><div>40709</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_METHOD</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_URI</td><td valign="top">:</td><td><div>/prototype/default/insert_biosource/1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SCRIPT_FILENAME</td><td valign="top">:</td><td><div>/home/www-data/web2py/wsgihandler.py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SCRIPT_NAME</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_ADDR</td><td valign="top">:</td><td><div>10.4.3.130</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_ADMIN</td><td valign="top">:</td><td><div>[no address given]</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_NAME</td><td valign="top">:</td><td><div>metabolomics.iiit.ac.in</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PORT</td><td valign="top">:</td><td><div>80</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PROTOCOL</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_SIGNATURE</td><td valign="top">:</td><td><div>&lt;address&gt;Apache/2.2.22 (Ubuntu) Server at metabolomics.iiit.ac.in Port 80&lt;/address&gt;\n</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_SOFTWARE</td><td valign="top">:</td><td><div>Apache/2.2.22 (Ubuntu)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.application_group</td><td valign="top">:</td><td><div>127.0.1.1|</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.callable_object</td><td valign="top">:</td><td><div>application</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.handler_script</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.input_chunked</td><td valign="top">:</td><td><div>0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.listener_host</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.listener_port</td><td valign="top">:</td><td><div>80</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.process_group</td><td valign="top">:</td><td><div>web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.request_handler</td><td valign="top">:</td><td><div>wsgi-script</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.script_reloading</td><td valign="top">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">mod_wsgi.version</td><td valign="top">:</td><td><div><table><tr><td><div>3</div></td></tr><tr><td><div>3</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.errors</td><td valign="top">:</td><td><div>&lt;mod_wsgi.Log object at 0x7f08ba3e3e30&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.file_wrapper</td><td valign="top">:</td><td><div>&lt;built-in method file_wrapper of mod_wsgi.Adapter object at 0x7f08ba3c8cd8&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.input</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f08c1cd64c8&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.version</td><td valign="top">:</td><td><div>1</div></td></tr></table></div></td></tr></table></div></td></tr></table></div>'
+tRp70
+sS'frames'
+p71
+(lp72
+(dp73
+S'file'
+p74
+S'/home/www-data/web2py/gluon/restricted.py'
+p75
+sS'dump'
+p76
+(dp77
+S'environment'
+p78
+S"{'A': <class 'gluon.html.A'>, 'Auth': <class 'gluon.tools.Auth'>, 'B': <class 'gluon.html.B'>, 'BEAUTIFY': <class 'gluon.html.BEAUTIFY'>, 'BODY': <class 'gluon.html.BODY'>, 'BR': <class 'gluon.html.BR'>, 'BUTTON': <class 'gluon.html.BUTTON'>, 'CAT': <class 'gluon.html.CAT'>, 'CENTER': <class 'gluon.html.CENTER'>, 'CLEANUP': <class 'gluon.validators.CLEANUP'>, ...}"
+p79
+sS'ccode'
+p80
+S'<code object <module> at 0x7f08ba3c7830, file "/...2py/applications/prototype/models/db.py", line 9>'
+p81
+ssS'lnum'
+p82
+I212
+sS'lines'
+p83
+(dp84
+I207
+S'    try:'
+p85
+sI208
+S'        if isinstance(code, types.CodeType):'
+p86
+sI209
+S'            ccode = code'
+p87
+sI210
+S'        else:'
+p88
+sI211
+S'            ccode = compile2(code, layer)'
+p89
+sI212
+S'        exec ccode in environment'
+p90
+sI213
+S'    except HTTP:'
+p91
+sI214
+S'        raise'
+p92
+sI215
+S'    except RestrictedError:'
+p93
+sI216
+S'        # do not encapsulate (obfuscate) the original RestrictedError'
+p94
+ssS'call'
+p95
+S'(code="\\xef\\xbb\\xbf#s scaffolding model makes your app work on G...s.first_name)+\' \'+str(ans.last_name)\\n   return f\\n", environment={\'A\': <class \'gluon.html.A\'>, \'Auth\': <class \'gluon.tools.Auth\'>, \'B\': <class \'gluon.html.B\'>, \'BEAUTIFY\': <class \'gluon.html.BEAUTIFY\'>, \'BODY\': <class \'gluon.html.BODY\'>, \'BR\': <class \'gluon.html.BR\'>, \'BUTTON\': <class \'gluon.html.BUTTON\'>, \'CAT\': <class \'gluon.html.CAT\'>, \'CENTER\': <class \'gluon.html.CENTER\'>, \'CLEANUP\': <class \'gluon.validators.CLEANUP\'>, ...}, layer=\'/home/www-data/web2py/applications/prototype/models/db.py\')'
+p96
+sS'func'
+p97
+S'restricted'
+p98
+sa(dp99
+g74
+S'/home/www-data/web2py/applications/prototype/models/db.py'
+p100
+sg76
+(dp101
+S'comment'
+p102
+S'undefined'
+p103
+sS'singular'
+p104
+g103
+sS'IS_NOT_EMPTY'
+p105
+S"<class 'gluon.validators.IS_NOT_EMPTY'>"
+p106
+sS'plural'
+p107
+g103
+sS'builtinTrue'
+p108
+S'True'
+p109
+sS'required'
+p110
+g103
+sS'label'
+p111
+g103
+sS'Field'
+p112
+S"<class 'gluon.dal.Field'>"
+p113
+sS'notnull'
+p114
+g103
+sS'requires'
+p115
+g103
+ssg82
+I190
+sg83
+(dp116
+I192
+S''
+sI193
+S''
+sI194
+S'#schema changes - date est other has been changed from date to text and the label has been changed'
+p117
+sI185
+S''
+sI186
+S"    Field('organ' ,'string',required=True,notnull=True,requires=IS_NOT_EMPTY()),"
+p118
+sI187
+S"    Field('organ_spec','string',label='Organ Specification',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='Name or description of specific part of organ if any used for the study'),"
+p119
+sI188
+S"    Field('cell_type','string',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment = 'Specific plant cells used after dissection or cell sorting or any other method. This naming should be used based on Plant Ontology Consortium (POC)'),"
+p120
+sI189
+S"    Field('sub_cell_location','string',label='Sub Cellular Location',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='This is about sub cellular locations from cells are collected for experiment. Naming should be maintained based on Gene Ontology Cellular Component'),"
+p121
+sI190
+S"    Field('bio_source_amount','string',label='BioSource Amount',required=True,notnull=True,requires=IS_NOT_EMPTY()),singular = 'Biosource',plural = 'Biosource',comment='This is reference to the mass (mg fresh weight or mg dry weight), number of cells or other measurable quantification information')"
+p122
+sI191
+S''
+ssg95
+S'()'
+p123
+sg97
+S'<module>'
+p124
+sa(dp125
+g74
+S'/home/www-data/web2py/gluon/dal.py'
+p126
+sg76
+(dp127
+S'tablename'
+p128
+S"'biosource'"
+p129
+sS'invalid_args'
+p130
+S"set(['comment'])"
+p131
+ssg82
+I7646
+sg83
+(dp132
+I7648
+S'            self._LAZY_TABLES[tablename] = (tablename,fields,args)'
+p133
+sI7649
+S'            table = None'
+p134
+sI7650
+S'        else:'
+p135
+sI7641
+S'            self.check_reserved_keyword(tablename)'
+p136
+sI7642
+S'        else:'
+p137
+sI7643
+S'            invalid_args = set(args)-TABLE_ARGS'
+p138
+sI7644
+S'            if invalid_args:'
+p139
+sI7645
+S'                raise SyntaxError(\'invalid table "%s" attributes: %s\' \\'
+p140
+sI7646
+S'                    % (tablename,invalid_args))'
+p141
+sI7647
+S'        if self._lazy_tables and not tablename in self._LAZY_TABLES:'
+p142
+ssg95
+S'(self=<DAL uri="sqlite://storage.sqlite">, tablename=\'biosource\', *fields=(<gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>), **args={\'comment\': \'This is reference to the mass (mg fresh weight o...ls or other measurable quantification information\', \'plural\': \'Biosource\', \'singular\': \'Biosource\'})'
+p143
+sg97
+S'define_table'
+p144
+sasS'pyver'
+p145
+S'Python 2.7.3: /usr/bin/python (prefix: /usr)'
+p146
+sS'session'
+p147
+g69
+(S's\x1a\x00\x00\x00<div><table></table></div>'
+tRp148
+sS'etype'
+p149
+S"<type 'exceptions.SyntaxError'>"
+p150
+sS'date'
+p151
+S'Tue Mar 12 00:34:07 2013'
+p152
+sS'response'
+p153
+g69
+(S's\xe3\x11\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f08ba3fa7a0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">session_id_prototype</td><td valign="top">:</td><td><div>10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div>/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">delimiters</td><td valign="top">:</td><td><div><table><tr><td><div>{{</div></td></tr><tr><td><div>}}</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">files</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">flash</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">generic_patterns</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">headers</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">X-Powered-By</td><td valign="top">:</td><td><div>web2py</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">menu</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">meta</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">models_to_run</td><td valign="top">:</td><td><div><table><tr><td><div>^\\w+\\.py$</div></td></tr><tr><td><div>^default/\\w+\\.py$</div></td></tr><tr><td><div>^default/insert_biosource/\\w+\\.py$</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">postprocessing</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_cookie_expires</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_data_name</td><td valign="top">:</td><td><div>session_data_prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_file</td><td valign="top">:</td><td><div>&lt;open file &#x27;/home/www-data/web2py/applications/prototype/sessions/10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780&#x27;, mode &#x27;rb+&#x27; at 0x7f08b9415f60&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_filename</td><td valign="top">:</td><td><div>/home/www-data/web2py/applications/prototype/sessions/10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id</td><td valign="top">:</td><td><div>10.1.33.94-116dc787-d480-4a04-a13f-47a287bd7780</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_name</td><td valign="top">:</td><td><div>session_id_prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_locked</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_new</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_storage_type</td><td valign="top">:</td><td><div>file</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">status</td><td valign="top">:</td><td><div>200</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">view</td><td valign="top">:</td><td><div>default/insert_biosource.html</div></td></tr></table></div>'
+tRp154
+sS'locals'
+p155
+(dp156
+S'fields'
+p157
+S'(<gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>)'
+p158
+sS'self'
+p159
+S'<DAL uri="sqlite://storage.sqlite">'
+p160
+sg52
+S"{'comment': 'This is reference to the mass (mg fresh weight o...ls or other measurable quantification information', 'plural': 'Biosource', 'singular': 'Biosource'}"
+p161
+sS'tablename'
+p162
+S"'biosource'"
+p163
+sS'invalid_args'
+p164
+S"set(['comment'])"
+p165
+sssS'traceback'
+p166
+S'Traceback (most recent call last):\n  File "/home/www-data/web2py/gluon/restricted.py", line 212, in restricted\n    exec ccode in environment\n  File "/home/www-data/web2py/applications/prototype/models/db.py", line 190, in <module>\n    Field(\'bio_source_amount\',\'string\',label=\'BioSource Amount\',required=True,notnull=True,requires=IS_NOT_EMPTY()),singular = \'Biosource\',plural = \'Biosource\',comment=\'This is reference to the mass (mg fresh weight or mg dry weight), number of cells or other measurable quantification information\')\n  File "/home/www-data/web2py/gluon/dal.py", line 7646, in define_table\n    % (tablename,invalid_args))\nSyntaxError: invalid table "biosource" attributes: set([\'comment\'])\n'
+p167
+s.

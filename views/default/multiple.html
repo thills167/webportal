@@ -1,0 +1,100 @@
+{{extend 'layout.html'}}
+<script>
+  $(document).ready(function() {
+		  $('#secret').click( function() {
+			 $('.collapse').collapse('toggle'); });
+
+});
+</script>
+<h5>{{=leng}}</h5>
+{{if error == 'error':}}
+<h3>Error</h3>
+<h4>Please go back and select two or more samples to compare.</h4>
+{{pass}}
+{{if error=='':}}
+{{l=['biosource','plant_growth_condition','treatments','harvests','gas_chromatography','liquid_chromatography','mass_spectroscopy','spectrophotometry','sample']}}
+<span class="pull-right">
+<i class="icon-wrench"></i>
+<button type="button" class="btn btn-primary label" id="secret">collapse/toggle all </button>
+</span>
+<h4>Selected Samples</h4>
+{{=SQLFORM.grid(query[l[8]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('Files',_href=URL('default','multiple_files',args=row.id)),lambda row: A('View',_href=URL('default','sample',args=row.id))])}}
+<br>
+<span>
+<button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#biosource"> Bio-Source </button>
+</span>
+
+<div id="biosource" class="collapse in">
+{{=SQLFORM.grid(query[l[0]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[0],row.id]))])}}
+</div>
+
+<span>
+<button type="button" class="btn btn-success" data-toggle="collapse" data-target="#pgcondition"> Plant Growth Condition</button>
+</span>
+
+<div id="pgcondition" class="collapse in">
+{{=SQLFORM.grid(query[l[1]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[1],row.id]))])}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-warning" data-toggle="collapse" data-target="#treatment"> Treatment </button>
+</span>
+
+<div id="treatment" class="collapse in">
+{{=SQLFORM.grid(query[l[2]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[2],row.id]))])}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-danger" data-toggle="collapse" data-target="#harvest"> Harvest </button>
+</span>
+
+<div id="harvest" class="collapse in">
+{{=SQLFORM.grid(query[l[3]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[3],row.id]))])}}
+</div>
+
+
+
+<span>
+<button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#gc"> Gas Chromatography </button>
+</span>
+
+<div id="gc" class="collapse in">
+{{=SQLFORM.grid(query[l[4]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[4],row.id]))])}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-success" data-toggle="collapse" data-target="#lc"> Liquid Chromatography </button>
+</span>
+
+<div id="lc" class="collapse in">
+{{=SQLFORM.grid(query[l[5]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[5],row.id]))])}}
+</div>
+
+
+
+<span>
+<button type="button" class="btn btn-warning" data-toggle="collapse" data-target="#ms"> Mass Spectroscopy </button>
+</span>
+
+<div id="ms" class="collapse in">
+{{=SQLFORM.grid(query[l[6]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[6],row.id]))])}}
+</div>
+
+
+<span>
+<button type="button" class="btn btn-inverse" data-toggle="collapse" data-target="#spc"> Spectrophotometry </button>
+</span>
+
+<div id="spc" class="collapse in">
+{{=SQLFORM.grid(query[l[7]],searchable=False,create =False,details=False,deletable=False,editable=False,links=[ lambda row: A('View',_href=URL('default','router',args=['view',l[7],row.id]))])}}
+</div>
+{{pass}}

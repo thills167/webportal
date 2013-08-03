@@ -1,0 +1,169 @@
+{{extend 'layout.html'}}
+<style type="text/css">
+#customers
+{
+font-family:"Trebuchet MS", Arial, Helvetica, sans-serif;
+width:100%;
+border-collapse:collapse;
+}
+#customers td, #customers th 
+{
+font-size:1em;
+border:1px solid #98bf21;
+padding:3px 7px 2px 7px;
+}
+#customers th 
+{
+font-size:1.1em;
+text-align:left;
+padding-top:5px;
+padding-bottom:4px;
+background-color:#A7C942;
+color:#ffffff;
+}
+#customers tr.alt td 
+{
+color:#000000;
+background-color:#EAF2D3;
+}
+</style>
+<center><h3>Project: {{=project.name}}</h3></center>
+</br>
+<table ><tr id="pen{{=project.id}}">
+
+<!--td>
+<button onclick="ajax('{{=URL('ajx_publish',args=('publish',project.id))}}',[],null);jQuery('tr#pen{{=project.id}}').slideUp()">Publish</button>
+</td-->
+<div align="right">
+{{if is_coordinator:}}
+{{if  project.project_status == "0":}}
+{{=H5(A('Publish Project',_href=URL('ajx_publish',args=('publish',project.id))))}}
+{{pass}}
+{{if  project.project_status == "1":}}
+{{=H5(A('UnPublish Project',_href=URL('ajx_publish',args=('unpublish',project.id))))}}
+{{pass}}
+{{pass}}
+</div>
+<!--table>
+<td>
+{{if project.project_status == '0':}}
+</td>
+<td>
+{{=H5(A('SignUp for Project',_href=URL('reg_project',args=project.id)))}}
+</td>
+<td>
+{{if project.project_coordinator == auth.user.id: }}
+{{=H5(A('Role management',_href=URL('roles',args=project.id)))}}
+{{pass}}
+</td>
+<td>
+{{=H5(A('Add new Sample',_href=URL('add_sample',args=project.id)))}}
+</td>
+<td>
+{{=H5(A('My Samples',_href=URL('my_samples',args=(project.id))))}}
+</td>
+<td>
+{{pass}}
+{{if project.project_status == '1':}}
+{{=H5(A('Published Samples',_href=URL('list_all_pub_samples',args=(project.id))))}}
+{{pass}}
+</td>
+</table-->
+<body>
+<h4>Project Details</h4>
+<table id = 'customers' class="table table-hover">
+<tr><td><b>Project code</b></td><td>{{=project.code}}</td></tr>
+<tr><td><b>Project Start Date</b></td>  <td>{{=project.start_date}}</td></tr>
+<tr><td><b>Institute/Lab</b></td>  <td>{{=cord.affiliated_to}}</td></tr>
+<tr><td><b>Project Description</b> </td>  <td>{{=project.project_description}}</td></tr>
+{{if project.project_literature_reference : }}
+<tr><td><b>Project References</b> </td>  <td>{{=H5(A(project.project_literature_reference,_href='http://www.ncbi.nlm.nih.gov/pubmed/'+str(project.project_literature_reference)))}}</td></tr>
+{{pass}}
+<tr><td><b>Already Published Work</td></b>  <td>{{=project.project_journal_name}}</td></tr>
+{{if project.project_publication_date:}}
+{{delta = project.project_publication_date - project.start_date}}
+<tr><td><b>Project Duration</td></b>  <td>{{= str(delta.days)+' days'}}</td></tr>
+{{pass}}
+</table>
+</br></br>
+
+<h4>People Involved in project:</h4>
+</br>
+<table id = 'customers'>
+<tr>
+<td><b>Project Co-Ordinator </b></td>
+<td>{{=A(cord.first_name+' '+cord.last_name,_href=URL('user_viewer',args=cord.id))}}</td>
+</tr>
+<tr>
+
+<td><b>Investigators</b></td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='0':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+<tr>
+<td>
+<b>{{="Co-Investigators"}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='1':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+
+<tr>
+<td>
+<b>{{="Collaborators "}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='2':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+
+<!--tr>
+<td>
+{{#="Analysts :-"}}
+</td>
+<td>
+{{#for user in users:}}
+{{#if user.role.role=='3':}}
+{{#=user.auth_user.first_name}}
+{{#pass}}
+{{#pass}}
+</td>
+</tr-->
+
+
+
+
+<tr>
+<td>
+<b>{{="Experimentalists :-"}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='4':}}
+{{=A(user.auth_user.first_name+" "+user.auth_user.last_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+</table>
+</br>

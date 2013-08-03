@@ -1,0 +1,20 @@
+{{extend 'layout.html'}}
+{{if auth.user:}}
+{{if authenticated=='':}}
+  {{=(B(A(' Add New Project',_href=URL('add_project'))))}}
+{{pass}}
+{{pass}}
+<h4>List of All Published Projects </h4>
+<ol>
+{{for project in pub_projects:}}
+  {{=LI(B(A(project.name,_href=URL('project_viewer',args=project.id))),BR(),B("Project Code : "+project.code))}}
+{{pass}}
+</ol>
+{{if auth.user:}}
+<h4>List of All Unpublished Projects </h4>
+<ol>
+   {{for project in dev_projects:}}
+      {{=LI(B(A(project.name,_href=URL('project_viewer',args=project.id))),BR(),("Project Code : "+project.code))}}
+   {{pass}}
+{{pass}}
+</ol>

@@ -1,0 +1,65 @@
+{{extend 'layout.html'}}
+{{if error:}}
+<p>{{=error}}</p>
+{{else:}}
+<h4> List of pending requests</h4>
+<ul>
+<table>
+{{for row in pending:}}
+ <tr>
+   <th>User</th>
+   <th> Role Applied</th>
+   <th></th>
+ </tr>
+ <tr id="pen{{=row.role.id}}">
+ <td>{{=SPAN(row.auth_user.first_name,row.auth_user.last_name)}}</td>
+ <td>{{=role_list[int(row.role.role)]}}</td>
+ <td><button onclick="ajax('{{=URL('ajx_role',args=('accept',row.role.id))}}',[],null);jQuery('tr#pen{{=row.role.id}}').slideUp()";>Accept</button></td>
+ <td><button onclick="ajax('{{=URL('ajx_role',args=('deny',row.role.id))}}',[],null);jQuery('tr#pen{{=row.role.id}}').slideUp()";>Deny</button></td>
+ <td><button onclick="ajax('{{=URL('ajx_role',args=('block',row.role.id))}}',[],null);jQuery('tr#pen{{=row.role.id}}').slideUp()";>Block</button></td></tr>
+
+{{pass}}
+</table>
+</ul>
+<h4>List of Accepted requests </h4>
+<ul>
+<table>
+{{for row in accepted:}}
+ <tr>
+   <th>User</th>
+   <th> Current Role</th>
+   <th></th>
+ </tr>
+ <tr id="app{{=row.role.id}}"> 
+ <td>{{=SPAN(row.auth_user.first_name,row.auth_user.last_name)}}</td>
+ <td>{{=role_list[int(row.role.role)]}}</td>
+ <td><button onclick="ajax('{{=URL('ajx_role',args=('delete',row.role.id))}}',[],null);jQuery('tr#app{{=row.role.id}}').slideUp()">Delete</button></td>
+ </tr>
+{{pass}}
+</table>
+</ul>
+<h4>List of Blocked Persons </h4>
+<ul>
+<table>
+{{for row in blocked:}}
+ <tr>
+   <th>User</th>
+   <th>Role </th>
+   <th></th>
+ </tr>
+ <tr id="blo{{=row.role.id}}">
+ <td>{{=SPAN(row.auth_user.first_name,row.auth_user.last_name,row.role.role)}}</td>
+ <td>{{=role_list[int(row.role.role)]}}</td>
+ <td><button onclick="ajax('{{=URL('ajx_role',args=('unblock',row.role.id))}}',[],null);jQuery('tr#blo{{=row.role.id}}').slideUp()";>Unblock</button></td>
+ </tr>
+{{pass}}
+<tr>
+<div align='center'>
+<INPUT type="button" value="DONE"
+onclick="location.href='{{=URL('project_viewer',args=pid)}}'"/>
+</FORM>
+</div>
+</tr>
+</table>
+</ul>
+{{pass}}

@@ -1,0 +1,14 @@
+{{extend 'layout.html'}}
+<style>
+.textarea {
+}
+</style>
+<center>
+
+
+<table border='1'><tr><td>SAMPLE NAME</td><td><b>{{=samp.name}}</b></td><td></td><td>SAMPLE CODE</td><td><b>{{=samp.code}}</b></td></tr></table></center>
+<h5>GAS CHROMATOGRAPHY</h5>
+{{request.args.append('clear')}}
+<INPUT type="button" class="btn btn-success" value="Clear Form"
+onclick="location.href='{{=URL('insert_gc',args=request.args)}}'"/>
+{{=form}}

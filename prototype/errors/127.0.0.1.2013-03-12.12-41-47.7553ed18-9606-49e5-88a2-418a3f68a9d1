@@ -1,0 +1,644 @@
+(dp1
+S'output'
+p2
+S"<class 'sqlite3.OperationalError'> Cannot add a NOT NULL column with default value NULL"
+p3
+sS'layer'
+p4
+S'/home/www-data/web2py/applications/prototype/models/db.py'
+p5
+sS'code'
+p6
+S"\xef\xbb\xbf#s scaffolding model makes your app work on Google App Engine too\n## File is released under public domain and you can use without limitations\n#########################################################################\n\n## if SSL/HTTPS is properly configured and you want all HTTP requests to\n## be redirected to HTTPS, uncomment the line below:\n# request.requires_https()\n\nif not request.env.web2py_runtime_gae:\n    ## if NOT running on Google App Engine use SQLite or other DB\n    db = DAL('sqlite://storage.sqlite')\nelse:\n    ## connect to Google BigTable (optional 'google:datastore://namespace')\n    db = DAL('google:datastore')\n    ## store sessions and tickets there\n    session.connect(request, response, db = db)\n    ## or store session in Memcache, Redis, etc.\n    ## from gluon.contrib.memdb import MEMDB\n    ## from google.appengine.api.memcache import Client\n    ## session.connect(request, response, db = MEMDB(Client()))\n\n## by default give a view/generic.extension to all actions from localhost\n## none otherwise. a pattern can be 'controller/function.extension'\nresponse.generic_patterns = ['*'] if request.is_local else []\n## (optional) optimize handling of static files\n# response.optimize_css = 'concat,minify,inline'\n# response.optimize_js = 'concat,minify,inline'\n\n#########################################################################\n## Here is sample code if you need for\n## - email capabilities\n## - authentication (registration, login, logout, ... )\n## - authorization (role based authorization)\n## - services (xml, csv, json, xmlrpc, jsonrpc, amf, rss)\n## - old style crud actions\n## (more options discussed in gluon/tools.py)\n#########################################################################\n\nfrom gluon.tools import Auth, Crud, Service, PluginManager, prettydate\nauth = Auth(db, hmac_key=Auth.get_or_create_key())\ncrud, service, plugins = Crud(db), Service(), PluginManager()\n\n## create all tables needed by auth if not custom tables\n\ndb.define_table('affiliation',\n\t\tField('name','string',required=True,requires=IS_NOT_EMPTY()),\n\t\tField('description','text',required=True),format='%(name)s')\n\n\nauth.settings.extra_fields['auth_user'] = [\n     Field('title',notnull=True,required=True,requires=IS_IN_SET({'0':'Mr','1':'Mrs','2':'Ms','3':'Prof','4':'Dr'}),label = 'Salutation'),\n     Field('position',notnull=False,label='Positon',required=True,requires=IS_IN_SET({'0':'Post Doctoral Fellow','1':'Scientist','2':'Post Graduate/Phd student','3':'Under Graduate','4':'Faculy/Project Co-ordinator'})),\n#     Field('middle',notnull=False,required=False,label='Middle Name'),\n     Field('affiliated_to',requires=IS_NOT_EMPTY(),label = 'Affiliation'),\n     Field('address','text', label='Postal Address',required=True,requires = IS_NOT_EMPTY()),\n     Field('city',notnull=False,required=True,requires=IS_NOT_EMPTY(),label = 'City'),\n     Field('country',notnull=True,required=True,requires=IS_NOT_EMPTY(),default = 'India',label = 'Country'),\n     Field('postal_code',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Postal Code'),\n     Field('phone',label = 'Telephone Number'),\n     Field('mobile',notnull=True,required=True,requires=IS_NOT_EMPTY(),label = 'Mobile Number')\n     #Field('registration_at',notnull=False,required=False,requires=IS_IN_SET({'0':'IIIT Hyderabad','1':'JNU Delhi'}),label ='Registration at',comment='centre you wish to attend for the workshop')\n]\n\t\n#auth.define_tables(username=True)\nauth.define_tables()\n\n## configure email\nmail=auth.settings.mailer\nmail.settings.server = 'mail.iiit.ac.in:25'\nmail.settings.sender = 'metabolomics@iiit.ac.in'\n#mail.settings.login = 'username:password'\n\n## configure auth policy\nauth.settings.registration_requires_verification = False\nauth.settings.registration_requires_approval = False\nauth.settings.reset_password_requires_verification = False\n\nauth.messages.verify_email = 'Click on the link http://metabolomics.iiit.ac.in/module_1_modified/default/user/verify_email'+'/%(key)s to verify your email'\n\n## if you need to use OpenID, Facebook, MySpace, Twitter, Linkedin, etc.\n## register with janrain.com, write your domain:api_key in private/janrain.key\nfrom gluon.contrib.login_methods.rpx_account import use_janrain\nuse_janrain(auth,filename='private/janrain.key')\n\n#########################################################################\n## Define your tables below (or better in another model file) for example\n##\n## >>> db.define_table('mytable',Field('myfield','string'))\n##\n## Fields can be 'string','text','password','integer','double','boolean'\n##       'date','time','datetime','blob','upload', 'reference TABLENAME'\n## There is an implicit 'id integer autoincrement' field\n## Consult manual for more options, validators, etc.\n##\n## More API examples for controllers:\n##\n## >>> db.mytable.insert(myfield='value')\n## >>> rows=db(db.mytable.myfield=='value').select(db.mytable.ALL)\n## >>> for row in rows: print row.id, row.myfield\n#########################################################################\nimport datetime\nnow = datetime.datetime.now()\ntoday_date = datetime.datetime.today() \n\nrole_list = ['investigator','co_investigator','collaborator','analyst','experimentalist','member','project_coordinator']\n\nT.force('en-de')\n\ndb.define_table('project',\n     Field('name',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.name'),label='Project Name'),\n     Field('code',notnull=True,unique=True,required=True,requires=IS_NOT_IN_DB(db,'project.code'),label='Project Code'),\n     Field('start_date','date',default=today_date,notnull=True,required=True,requires=IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),\n     Field('project_coordinator','reference auth_user'),\n     Field('project_description','text',required = True,requires= IS_NOT_EMPTY(),label='Brief Description of Experiment/Project'),\n     #Field('project_description_upload','upload',label='Or upload'),\n     Field('project_status',notnull=True,default='0',requires=IS_IN_SET({'0':'Development','1':'Published'})),\n     Field('project_literature_reference','integer',label='Literature Reference Pubmed ID (Any relevant published Document)'),\n     Field('project_journal_name','string',label='Already Published Work'),\n     Field('project_publication_date','date',writable=False,readable=False,required=False),\n     \n     #Field('project_pubmed_id','string',label='PubMed ID'),\n     format='%(name)s')\n\n\ndb.define_table('role',\n     Field('user','reference auth_user'),\n     Field('project','reference project'), \n     Field('role',notnull=True,required=True,requires=IS_IN_SET({'0':'Investigator','1':'Co-Investigator','2':'Collaborator','4':'Experimentalist'})),\n     Field('approval_status',notnull=True,requires=IS_IN_SET({'0':'Pending','1':'Approved','2':'Blocked'})),\n     Field('member_since',readable=False,writable=False,notnull=True,required=True,default=request.now))\n#recent = db(db.role.user>now-datetime.timedelta(10))\n#db.role.user.requires = IS_NOT_IN_DB(db,'role.user','role.role','role.project')\n \n#the user and code and required time should be not null , required ..  \n#added project field to sync with db.insert in controller\ndb.define_table('sample',\n    Field('parent','reference sample',writable=False),\n    Field('experimentalist','reference auth_user',writable=False),\n   # Field('analyst','reference auth_user'),\n    Field('name',notnull=True,required=True,label='Sample Name'),\n    Field('code',required=True,label='Sample Code'),\n    #requires=IS_NOT_IN_DB(db,'sample.code'),\n    Field('description','text',length=2000,label='Sample Description'),\n   # Field('project','reference project'),\n    Field('scientific_name','string'),\n    Field('experiment','reference experiment',writable=False),\n    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),\n    Field('replica',default='Original',required=True,requires=IS_IN_SET(['Original','replicate','aliquot']),label='Type'),\n    Field('publication_status','boolean',default=False,required=True,label='Pub?'),format='%(name)s',singular='Sample',plural='Samples')\n\n\ndb.define_table('template',\n    Field('user',unique=True,),\n    Field('sample','reference sample'))\n\ndb.define_table('experiment',\n    Field('experimentalist','reference auth_user'),\n   # Field('analyst','reference auth_user'),\n    Field('name',unique=True,notnull=True,required=True,label='Experiemnt Name'),\n    Field('code',required=True,requires=IS_NOT_IN_DB(db,'experiment.code'),label='Experiment Code'),\n    Field('description','text',length=2000,notnull=True,required=True,label='experiment Description'),\n    Field('project','reference project',writable=False),\n    Field('working_status',default=1,required=True,requires=IS_IN_SET({'0':'Completed','1':'In Progress'})),\n    Field('publication_status','boolean',default=False,required=True,label='Published'),format='%(name)s',singular='experiment/group',plural='Experiments/Groups')\n\ndb.define_table('project_meta',\n   Field('project','reference project'),\n   Field('enitity','reference entity'))\n\n#bio tables\n\n#schema changes - plant_type (Inbred,Hybrid,Complete) is added \n\n# 2.1 \ndb.define_table('biosource',\n    Field('sample_name','reference sample',writable = False),\n    Field('species_name','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_echotype','string',label='Echotype/Background',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('phenotype','string',label='Phenotype'),\n    Field('plant_type','string',requires=IS_IN_SET({'0':'Inbred','1':'Hybrid','2':'Composite'}),label='Plant Genetic Type'),\n    Field('Source_of_germplasm','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_pedigree_information','string',label='Pedigree Information',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('genotype_plant_type','string',label='Plant Type',required=True,notnull=True,requires=IS_IN_SET({'Transgenic Type','Mutant Type','Wild Type'})),\n    Field('genotype_gene_names','string',label='Gene Name(s)',required=True,notnull=True),\n#Field('geno_gene_name',)\n    \n    Field('organ' ,'string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n    Field('organ_spec','string',label='Organ Specification',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='Name or description of specific part of organ if any used for the study'),\n    Field('cell_type','string',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment = 'Specific plant cells used after dissection or cell sorting or any other method. This naming should be used based on Plant Ontology Consortium (POC)'),\n    Field('sub_cell_location','string',label='Sub Cellular Location',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='This is about sub cellular locations from cells are collected for experiment. Naming should be maintained based on Gene Ontology Cellular Component'),\n    Field('bio_source_amount','string',label='BioSource Amount',required=True,notnull=True,requires=IS_NOT_EMPTY(),comment='This is reference to the mass (mg fresh weight or mg dry weight), number of cells or other measurable quantification information'))\n\n\n\n#schema changes - date est other has been changed from date to text and the label has been changed\n\ndb.define_table('plant_growth_condition',\n    Field('sample_name','reference sample', writable = False),\n    Field('growth_soil','string',label='Soil (type, supplier)',),\t\t\n    Field('growth_agar','string',label='Agar (type, supplier)',),\t\t\n    Field('growth_vermiculite','string',label='Vermiculite (type, supplier)',),\t\t\n    Field('growth_hydroponic','string',label='Hydroponic system (type,supplier,nutrient concentrations)',),\t\t\n    Field('growth_cell_culture','string',label='Cell culture (media, volume,cell number per volume)',),\n    Field('loc_field_location','string',label='Location',),\t\n    Field('loc_field_avr_humidity','string',label='Average Humidity',),\n    Field('loc_field_avr_temp','string',label='Average Temperature',),\n    Field('loc_field_avr_rain','string',label='Average Rain Fall',),\n    Field('season','string'),\n    Field('Climate_chamber_size','string',label='Climate chamber size (m3)',),\n    Field('Climate_chamber_co2_concentration','string'),\n    Field('loc_green_location','string',label='Location',),\t\t\n    Field('loc_green_light','string',label='Light (quality,source mode/type,intensity, luminescence period(hr.),dark period (hr.))',),\t\t\n    Field('loc_green_humidity','string',label='Humidity (day,night)',),\n    Field('loc_green_temperature','string',label='Temperature (day,night)',),\t\t\n    Field('loc_green_water','string',label='Water Regime (Amount, time per day) ',),\n    Field('Growth_Protocol_Description','text',label='Growth Protocol Description'),\t\n    Field('growth_protocol_description_upload','upload',label='or'),\t\n    Field('Growth_Plot_Design','text',label='Growth Plot Design',),\t\t\n    Field('nutr_amount','string',label='Nutrient Amount',),\t\t\n    Field('nutr_duration','string',label='Duration',),\t\t\n    Field('nutr_add_info','text',label='Additional information',),\n    Field('sowing_period','string'),\n#,required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!',))),\t\t\n    Field('gerrminating_period','string'),\n#,label='Date of Germination',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\n    Field('date_est_transplanting','string'),\n#,label='Date of Transplanting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\n    Field('date_est_cutting','string'),\n#,label='Date of cutting',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\t\t\n    Field('date_est_grafting','string'),\n    Field('hydroponic_type','string'),\n    Field('hydroponic_supplier','string'),\n    Field('hydroponic_nutrient_concentration','string'),\n    Field('hydroponic_volume','string'),\n    Field('hydroponic_number_of_plats','string',label='No. of plats/tray or container'),\n    Field('hydroponic_frequency','string',label='frequency of nutrient changed'),\n    Field('hydroponic_aeration_provided','boolean'),\n    \n#,label='Date of Grafting ',required=False,requires=IS_EMPTY_OR(IS_DATE(format=T('%d-%m-%Y'),error_message='must be YYYY-MM-DD!'))),\t\n    Field('date_est_other','string',label='Additional Information (Stages etc)',required=False),\t\n    Field('other_spec','string',label='Other Specific Metadata'),\t\n    Field('other_spec_upload','upload',label='or'),singular = 'Plant Growth Condition',plural = 'Growth'\n    ) \n\n\ndb.define_table('treatments',\n    Field('sample_name','reference sample', writable = False),\n    Field('treament_biotic_factor','string',label='Biotic'),\n    Field('treatment_abiotic_factor','string',label='Abiotic'),\n    Field('treatment_intervention','string',label='Intervention'),\n    Field('treatment_dose','string',label='Treatment Dose/Intensity levels'),\n    Field('treatment_start_date','date',required=False,requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('treatment_time_duration','string',label='Treament Time(Duration)'),\n    Field('treatment_time','string'),\n    Field('treatment_time_interval','string'),\n    Field('treatment_description','text'),\n    Field('treatment_before_harvest','string',label='Treatment duration before harvest'),singular = 'Treatments',plural = 'Treatments')\n#2.4\n#schema changes - additional comments field is added for harvest amount \n\ndb.define_table('harvests',\n    Field('sample_name','reference sample', writable = False),\n    Field('harvest_date','date',label='Harvest Date(YYYY-MM-DD)',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('harvest_time','time',label='Harvest Time(HH:MM:SS)',requires=IS_EMPTY_OR(IS_TIME())),\n    Field('plant_growth_stage','string',label='plant growth stage/developmental stage'),\n    Field('metalbolism_quenching_method','text',length=2000),\n    Field('harvest_method','text'),\n    Field('harvest_amount','string',label='Harvest Amount(in grams)'),\n    Field('harvest_amount_comment','text'),\n    Field('harvest_storage_location','string'),\n    Field('sample_storage_description','text',label='Storage Description'),\n    Field('sample_storage_date','date',label='Storage Date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format=T('%d-%m-%Y'),maximum=datetime.date.today()))),\n    Field('sample_storage_location','string',label='Storage location'),\n    Field('sample_storage_temparature','string',label='Storage Temperature'),singular= 'Harvest',plural='Harvests')\n\n\n#seperate table for 2.6 to 2.7 since they are multivalued attributes for a sample\n\n\ndb.define_table('extraction_preparation',\n\t\tField('sample_name','reference sample', writable = False),\n\t\tField('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n                Field('harvest_stage','string'),\n\t\tField('sample_extraction_date','date',required=False,requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n                Field('amount_of_sample_taken','string'),\n\t\tField('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n\t\tField('extraction_solvent','text',length=1000),\n\t\tField('extraction_protocol','text'),\n                Field('extraction_protocol_name','text',label='name of protocol/Method'),\n\t\tField('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n\t\tField('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n\t\tField('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n    Field('plant_type','string',requires=IS_IN_SET({'0':'Inbred','1':'Hybrid','2':'Composite'}),label='Plant Genetic Type'),\n    Field('Source_of_germplasm','string',required=True,notnull=True,requires=IS_NOT_EMPTY()),\n                Field('storage_description','text',length=5000),\n\t\tField('storage_location','text',length=1000),\n\t\tField('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n\t\tField('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n\t\tField('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n                Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n\t\tField('storage_condition','text',length=1000),\n\t\tField('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),singular='Extr Preparation',plural='Extr Preparation')\n\n\n\n#3.1.1 GC\ndb.define_table('gas_chromatography',\n    Field('sample_name','reference sample', writable = False),\n    Field('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n    Field('sample_extraction_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n    Field('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n    Field('extraction_solvent','text',length=1000),\n    Field('extraction_protocol','text'),\n    Field('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n    Field('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n    Field('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n    Field('storage_description','text',length=5000),\n    Field('storage_location','text',length=1000),\n    Field('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n    Field('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n    Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_condition','text',length=1000),\n    Field('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),\n#GC\n    Field('instrument_manufacturer','string',label='Manufacturer'),\n    Field('instrument_model_name','string',label='Model name/number'),\n    Field('instrument_software_package','string',label='Software package'),\n    Field('instrument_version_number_or_date','string',label='Version number or Date'),\n#3.1.2 GC\n    Field('sample_phase','string',requires=IS_EMPTY_OR(IS_IN_SET(['polar','non-polar']))),\n    Field('derivatization_method','string',label='Method'),\n    Field('reagents_used_for_derivation','string',label='Reagents used for Derivatization'),\n    Field('derivatization_temperature','string',label='Derivatization temperature (in degree centigrade)'),\n    Field('derivatization_duration','string',label='Duration(in min)'),\n#3.1.3\n    Field('injector_model','string',label='Injector model/type'),\n    Field('injector_software_version','string',label='Software version'),\n    Field('method_name','text',label='Method name (used for sample injection)'),\n    Field('injection_volume','string'),\n    Field('wash_cycles','string',label='Wash cycles(volumes)'),\n    Field('solvent','string'),\n    Field('sample_size','string',label='Sample size/concentration'),\n#3.1.41\n    Field('column_manufacturer','string',label='Manufacturer'),\n    Field('product_name_and_catalogue_number_of_column','string',label='Product Name and catalogue number (year of catalogue)'),\n    Field('stationary_media_composition','string',requires=IS_NOT_EMPTY()),\n    Field('internal_diameter_of_column','string'),\n    Field('length_of_column','string'),\n    Field('column_temperature_program','text'),\n    Field('column_head_pressure','string',label='Column head pressure(in psi)'),\n    Field('flow_rate','double',label='Flow rate(in mL/min)'),\n#3.1.5\n    Field('seperation_method_name','string',label='Method name'),\n    Field('injector_temperature','string',label='Injector tempreature(in degree*c)'),\n    Field('split_splitless_mode','string',requires=IS_EMPTY_OR(IS_IN_SET({'0':'Split mode','1':'Splitless mode'})),label='Split or splitless mode'),\n    Field('split_ratio','string'),\n    Field('mobile_phase_composition','text'),\n    Field('mobile_phase_flow_rate','double',label='Mobile phase flow rate(in ml/min)'),\n    Field('thermal_gradient_profiles','text',length='1000'),\n\n#3.1.6\n    Field('validation_sample','string'),\n    Field('internal_standards','string'),\n    Field('external_standards','string'),\n    Field('chromatographic_resolution','string'),\n    Field('cycle_per_column','integer'),\n    Field('cycle_per_injector','integer'),\n    Field('cycle_per_septum','string'),\n    Field('cycle_per_blank','integer'),\n    Field('detector','string'),\n#3.1.7\n    Field('SOP_protocol_name','string'),\n    Field('date_of_analysis','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('operator','reference auth_user'),\n    Field('deviation_from_SOP','text',length=1000),\n    Field('tergetted_or_untargtted_approach',requires=IS_EMPTY_OR(IS_IN_SET({'0':'Targetted Approach','1':'Untargetted Approach'})),label='Approach'),\n    Field('publication_refernce','text',length=1000,label='Publication reference(If any)'),plural='GC')\n\n#LC\ndb.define_table('liquid_chromatography',\n    Field('sample_name','reference sample', writable = False),\n    Field('sample_id','integer',notnull=True,required=True,requires=IS_INT_IN_RANGE(0,100000000,error_message='Enter a positive number')),\n    Field('sample_extraction_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())),label='Date of sample Extraction'),\n    Field('sample_extraction_desc','text',length=5000,label='Sample Processing and Extraction'),\n    Field('extraction_solvent','text',length=1000),\n    Field('extraction_protocol','text'),\n    Field('extraction_volume','double',label='Extraction Volume (ml)',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(0,1000,error_message='too large !!'))),\n    Field('resuspension_process','text',length=5000,label='Extract Concentration and Resuspension Process'),\n    Field('extract_cleanup','text',length=5000,label='Extract Clean-Up'),\n    Field('storage_description','text',length=5000),\n    Field('storage_location','text',length=1000),\n    Field('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),\n    Field('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),\n    Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('storage_condition','text',length=1000),\n    Field('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),\n#LC    \n    Field('instrument_manufacturer','string',label='Manufacturer'),\n    Field('instrument_model_name_ornumber','string',label='Model name/number'),\n    Field('instrument_software_package','string',label='Software package'),\n    Field('instrument_version_number_or_date','string',label='Version number or Date'),\n#3.1.3\n    Field('injector_model','string',label='Injector model/type'),\n    Field('injector_software_version','string',label='Software version'),\n    Field('method_name','text',label='Method name (used for sample injection)'),\n    Field('injection_volume','string'),\n    Field('wash_cycles','string',label='Wash cycles(volumes)'),\n    Field('solvent','string'),\n    Field('sample_size_or_concentration',label='Sample size/concentration'),\n#3.1.41\n    Field('column_manufacturer','string',label='Manufacturer'),\n    Field('product_name_and_catalogue_number_of_column','string',label='Product Name and catalogue number (year of catalogue)'),\n    Field('stationary_media_composition','string'),\n    Field('internal_diameter_of_column','string'),\n    Field('length_of_column','text'),\n    Field('column_temperature_program','text'),\n    Field('column_head_pressure','double',label='Column head pressure(in psi)'),\n    Field('flow_rate','double',label='Flow rate(in mL/min)'),\n#3.1.5\n    Field('seperation_method_name','string',label='Method name'),\n    Field('injector_temperature','string',label='Injector tempreature(in degree*c)'),\n    Field('split_splitless_mode','string',requires=IS_EMPTY_OR(IS_IN_SET(['Split mode','Splitless mode'])),label='Split or splitless mode'),\n    Field('split_ratio','string'),\n    Field('mobile_phase_composition','text'),\n    Field('mobile_phase_flow_rate','double',label='Mobile phase flow rate(in ml/min)'),\n    Field('solvent_gradient_profiles','text',length='1000'),\n#3.1.6\n    Field('validation_sample','string'),\n    Field('internal_standards','string'),\n    Field('external_standards','string'),\n    Field('chromatographic_resolution','string'),\n    Field('chromatographic_resolution','string'),\n    Field('cycle_per_column','integer'),\n    Field('cycle_per_injector','integer'),\n    Field('cycle_per_septum','string'),\n    Field('cycle_per_blank','integer'),\n    Field('detector','string'),\n#3.1.7\n    Field('SOP_protocol_name','string'),\n    Field('date_of_analysis','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),\n    Field('operator','reference auth_user'),\n    Field('deviation_from_SOP','text',length=1000),\n    Field('tergetted_or_untargtted_approach',requires=IS_EMPTY_OR(IS_IN_SET({'0':'Targetted Approach','1':'Untargetted Approach'})),label='Approach'),\n    Field('publication_refernce','text',length=1000,label='Publication reference'),plural='LC')\n\n# main table for  3.2 \ndb.define_table('mass_spectroscopy',\n\n# table 3.2.1\n     Field('sample_name','reference sample', writable = False),\n     Field('manufacturer','string',),    \n     Field('model','string',),    \n     Field('oper_soft_name','string',label='operational software name ',),    \n     Field('oper_soft_ver','string',label='operational software version',),   \n\n# table 3.2.2\n     Field('ionization_mode','string',required=False),    \n     Field('polarity','string',required=False),    \n     Field('vaccum_pressure','string'),    \n     Field('len_voltages','string',label=' skimmer/focusing lens voltages '),    \n     Field('gas_flows','string'),    \n     Field('sour_temp','string',label='source temperature'),    \n\n      \n# table 3.2.3\n     Field('type_of_analyzer','string'),    \n     Field('m_range','string',label='m/z_range'),    \n     Field('calibration_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),    \n     Field('resolution1','string',label='resolution'),    \n     Field('mass_accuracy1','string',label='mass accuracy'),    \n     Field('log_program','string',label='logic program for data acquistion'),    \n     Field('spectral_acquisition_rate','string'),    \n     Field('vaccum_pressure','string'),    \n     Field('concentration','string'),    \n     Field('lock_mass','string'),    \n     Field('flow_rate','string'),    \n     Field('frequency','string'),    \n     Field('add_info','text',label='additional information '),\n\n\n# table 3.2.4\n     Field('tune','string'),\n     Field('sensitivity','string'),\n     Field('mass_accuracy2','string',label='mass accuracy'),\n     Field('resolution2','string',label='resolution'),\n\n      \n# table 3.2.5\n     Field('SOP_protocol','text'),\n     Field('date_of_data_acquistion','date'),\n     Field('operator','string'),\n     Field('data_acquisition_rate','string'),\n     \n     Field('deviation_from_SOP','string'),\n\n     Field('replicate_sample_analysis','integer'),plural='MS')\n\n\ndb.define_table('spectrophotometry',\n\n# table 3.2.1\n     Field('sample_name','reference sample', writable = False),\n     Field('wavelength','string'),\n     Field('optical_density','string'),\n     Field('Final_concentration_of_compound','string'),plural='SPM')\n\ndb.define_table('raw_data_storage_information',\n    Field('sample_name','reference sample',writable=False),\n    Field('email_id_of_person','string',label='Email id',required=True,requires=IS_EMAIL()),\n    Field('identification_of_metabolites','text',label='Identification Of Metabolites'),\n    Field('no_of_perks','integer',label='Number of Peaks'),\n    Field('no_of_peaks_unidentified','integer',label='Number of Unidentified Peaks'),\n    Field('number_of_metabolites','integer',label='Number Of Metabolites'),\n    Field('referred_library','string',label='Referred Library and Version'), \n    Field('raw_data_file_name','string',label='Raw data file name'),\n    Field('raw_data_file_upload','upload',label='Upload raw data file'),\n    Field('raw_data_standard_format','string',label='Raw data standard format'),\n    Field('raw_data_standard_format_upload','upload',label='Upload converted standard data file'),\n    \n    Field('additional_information_about_data','text',label='Additional information about data'),\n    Field('additional_information_upload','upload',label='Additional data file upload'),\n    Field('date_of_data_upload','date',label='Date of data uploaded',requires=IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today())\n    ),plural='RDS')\n\n\ndb.define_table('feedback',\n               Field('feedback_on',required=True),\n               Field('feedback_body','text',required=True,requires=IS_NOT_EMPTY()),\n               Field('feedback_by','reference auth_user',notnull=False))                                                              \n\n\n\n\ndb.define_table('sample_files',\n\t\tField('sample','reference sample',readable=False,writable=False),\n\t\tField('file','upload',label='Additional Sample Data',required=True,notnull=True),\n\t\tField('user','reference auth_user',readable=False,writable=False),\n\t\tField('description','text'),format='%(sample)s')\n\n\ndef name(identifier):\n   ans = db(db.auth_user.id == identifier).select().first()\n   f = str(ans.first_name)+' '+str(ans.last_name)\n   return f\n"
+p7
+sS'snapshot'
+p8
+(dp9
+S'exception'
+p10
+(dp11
+S'__module__'
+p12
+S"'sqlite3'"
+p13
+sS'__getslice__'
+p14
+S"<method-wrapper '__getslice__' of OperationalError object>"
+p15
+sS'__str__'
+p16
+S"<method-wrapper '__str__' of OperationalError object>"
+p17
+sS'__reduce__'
+p18
+S'<built-in method __reduce__ of OperationalError object>'
+p19
+sS'__dict__'
+p20
+S'{}'
+p21
+sS'__sizeof__'
+p22
+S'<built-in method __sizeof__ of OperationalError object>'
+p23
+sS'__weakref__'
+p24
+S'None'
+p25
+sS'__init__'
+p26
+S"<method-wrapper '__init__' of OperationalError object>"
+p27
+sS'__setattr__'
+p28
+S"<method-wrapper '__setattr__' of OperationalError object>"
+p29
+sS'__reduce_ex__'
+p30
+S'<built-in method __reduce_ex__ of OperationalError object>'
+p31
+sS'__new__'
+p32
+S'<built-in method __new__ of type object>'
+p33
+sS'__format__'
+p34
+S'<built-in method __format__ of OperationalError object>'
+p35
+sS'__class__'
+p36
+S"<class 'sqlite3.OperationalError'>"
+p37
+sS'__doc__'
+p38
+S'None'
+p39
+sS'__getitem__'
+p40
+S"<method-wrapper '__getitem__' of OperationalError object>"
+p41
+sS'__setstate__'
+p42
+S'<built-in method __setstate__ of OperationalError object>'
+p43
+sS'__getattribute__'
+p44
+S"<method-wrapper '__getattribute__' of OperationalError object>"
+p45
+sS'args'
+p46
+S"('Cannot add a NOT NULL column with default value NULL',)"
+p47
+sS'__subclasshook__'
+p48
+S'<built-in method __subclasshook__ of type object>'
+p49
+sS'__unicode__'
+p50
+S'<built-in method __unicode__ of OperationalError object>'
+p51
+sS'__delattr__'
+p52
+S"<method-wrapper '__delattr__' of OperationalError object>"
+p53
+sS'__repr__'
+p54
+S"<method-wrapper '__repr__' of OperationalError object>"
+p55
+sS'__hash__'
+p56
+S"<method-wrapper '__hash__' of OperationalError object>"
+p57
+ssS'evalue'
+p58
+S'Cannot add a NOT NULL column with default value NULL'
+p59
+sS'request'
+p60
+cgluon.html
+XML_unpickle
+p61
+(S's\xbeI\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">ajax</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">application</td><td valign="top">:</td><td><div>prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f703c508768&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cid</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">client</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">controller</td><td valign="top">:</td><td><div>default</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">session_id_admin</td><td valign="top">:</td><td><div>127.0.0.1-1879c173-798b-47e4-a926-8b64de9aab4f<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">env</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/www-data/web2py/applications/welcome/&#x27;, &#x27;/home/www-data/web2py/applications/prototype/&#x27;, &#x27;/home/www-data/web2py/applications/admin/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_options</td><td valign="top">:</td><td><div>&lt;Values at 0x2dd0638: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;metabolomics&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;/var/run/web2py/web2py.pid&#x27;, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;/home/www-data/web2py&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;minthreads&#x27;: None, &#x27;winservice&#x27;: &#x27;&#x27;, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;profiler_filename&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;scheduler_groups&#x27;: None, &#x27;password&#x27;: &#x27;&lt;recycle&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;interfaces&#x27;: None, &#x27;import_models&#x27;: False, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_encoding</td><td valign="top">:</td><td><div>gzip, deflate</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_accept_language</td><td valign="top">:</td><td><div>en-US,en;q=0.5</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_connection</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_cookie</td><td valign="top">:</td><td><div>session_id_admin=127.0.0.1-1879c173-798b-47e4-a926-8b64de9aab4f</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_host</td><td valign="top">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">http_user_agent</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/20100101 Firefox/17.0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>metabolomics</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path_info</td><td valign="top">:</td><td><div>/prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">query_string</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_addr</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">remote_port</td><td valign="top">:</td><td><div>34562</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_method</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">request_uri</td><td valign="top">:</td><td><div>/prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">script_name</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_name</td><td valign="top">:</td><td><div>metabolomics</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_port</td><td valign="top">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_protocol</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">server_software</td><td valign="top">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_path</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div><table><tr><td><div>2</div></td></tr><tr><td><div>4</div></td></tr><tr><td><div>2</div></td></tr><tr><td><div>stable</div></td></tr><tr><td><div>datetime.datetime(2013, 3, 4, 3, 26, 21)</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_errors</td><td valign="top">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0x7f7052e3c270&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_file_wrapper</td><td valign="top">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x2d54738&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_input</td><td valign="top">:</td><td><div>&lt;socket._fileobject object at 0x7f703853c850&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi_version</td><td valign="top">:</td><td><div><table><tr><td><div>1</div></td></tr><tr><td><div>0</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">extension</td><td valign="top">:</td><td><div>html</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">folder</td><td valign="top">:</td><td><div>/home/www-data/web2py/applications/prototype/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">function</td><td valign="top">:</td><td><div>index</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">get_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">global_settings</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">app_folders</td><td valign="top">:</td><td><div>set([&#x27;/home/www-data/web2py/applications/welcome/&#x27;, &#x27;/home/www-data/web2py/applications/prototype/&#x27;, &#x27;/home/www-data/web2py/applications/admin/&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">applications_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_args</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cmd_options</td><td valign="top">:</td><td><div>&lt;Values at 0x2dd0638: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;metabolomics&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;/var/run/web2py/web2py.pid&#x27;, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;/home/www-data/web2py&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;minthreads&#x27;: None, &#x27;winservice&#x27;: &#x27;&#x27;, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;profiler_filename&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;scheduler_groups&#x27;: None, &#x27;password&#x27;: &#x27;&lt;recycle&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;interfaces&#x27;: None, &#x27;import_models&#x27;: False, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">db_sessions</td><td valign="top">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">debugging</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">gluon_parent</td><td valign="top">:</td><td><div>/home/www-data/web2py</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_jython</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_pypy</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">local_hosts</td><td valign="top">:</td><td><div><table><tr><td><div>metabolomics</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>127.0.1.1</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">web2py_version</td><td valign="top">:</td><td><div><table><tr><td><div>2</div></td></tr><tr><td><div>4</div></td></tr><tr><td><div>2</div></td></tr><tr><td><div>stable</div></td></tr><tr><td><div>datetime.datetime(2013, 3, 4, 3, 26, 21)</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_https</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_local</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">is_restful</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">now</td><td valign="top">:</td><td><div>datetime.datetime(2013, 3, 12, 12, 41, 47, 165139)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">post_vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_args</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">raw_extension</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">url</td><td valign="top">:</td><td><div>/prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">utcnow</td><td valign="top">:</td><td><div>datetime.datetime(2013, 3, 12, 7, 11, 47, 165170)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">uuid</td><td valign="top">:</td><td><div>prototype/127.0.0.1.2013-03-12.12-41-47.7553ed18-9606-49e5-88a2-418a3f68a9d1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">vars</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">environ</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT</td><td valign="top">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_ENCODING</td><td valign="top">:</td><td><div>gzip, deflate</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_ACCEPT_LANGUAGE</td><td valign="top">:</td><td><div>en-US,en;q=0.5</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_CONNECTION</td><td valign="top">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_COOKIE</td><td valign="top">:</td><td><div>session_id_admin=127.0.0.1-1879c173-798b-47e4-a926-8b64de9aab4f</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_HOST</td><td valign="top">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">HTTP_USER_AGENT</td><td valign="top">:</td><td><div>Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/20100101 Firefox/17.0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">PATH_INFO</td><td valign="top">:</td><td><div>/prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">QUERY_STRING</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_ADDR</td><td valign="top">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REMOTE_PORT</td><td valign="top">:</td><td><div>34562</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_METHOD</td><td valign="top">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">REQUEST_URI</td><td valign="top">:</td><td><div>/prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SCRIPT_NAME</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_NAME</td><td valign="top">:</td><td><div>metabolomics</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PORT</td><td valign="top">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_PROTOCOL</td><td valign="top">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">SERVER_SOFTWARE</td><td valign="top">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.errors</td><td valign="top">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0x7f7052e3c270&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.file_wrapper</td><td valign="top">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x2d54738&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.input</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f703c508768&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multiprocess</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.multithread</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.run_once</td><td valign="top">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.url_scheme</td><td valign="top">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">wsgi.version</td><td valign="top">:</td><td><div>1</div></td></tr></table></div></td></tr></table></div></td></tr></table></div>'
+tRp62
+sS'frames'
+p63
+(lp64
+(dp65
+S'file'
+p66
+S'/home/www-data/web2py/gluon/restricted.py'
+p67
+sS'dump'
+p68
+(dp69
+S'environment'
+p70
+S"{'A': <class 'gluon.html.A'>, 'Auth': <class 'gluon.tools.Auth'>, 'B': <class 'gluon.html.B'>, 'BEAUTIFY': <class 'gluon.html.BEAUTIFY'>, 'BODY': <class 'gluon.html.BODY'>, 'BR': <class 'gluon.html.BR'>, 'BUTTON': <class 'gluon.html.BUTTON'>, 'CAT': <class 'gluon.html.CAT'>, 'CENTER': <class 'gluon.html.CENTER'>, 'CLEANUP': <class 'gluon.validators.CLEANUP'>, ...}"
+p71
+sS'ccode'
+p72
+S'<code object <module> at 0x7f703853c130, file "/...2py/applications/prototype/models/db.py", line 9>'
+p73
+ssS'lnum'
+p74
+I212
+sS'lines'
+p75
+(dp76
+I207
+S'    try:'
+p77
+sI208
+S'        if isinstance(code, types.CodeType):'
+p78
+sI209
+S'            ccode = code'
+p79
+sI210
+S'        else:'
+p80
+sI211
+S'            ccode = compile2(code, layer)'
+p81
+sI212
+S'        exec ccode in environment'
+p82
+sI213
+S'    except HTTP:'
+p83
+sI214
+S'        raise'
+p84
+sI215
+S'    except RestrictedError:'
+p85
+sI216
+S'        # do not encapsulate (obfuscate) the original RestrictedError'
+p86
+ssS'call'
+p87
+S'(code="\\xef\\xbb\\xbf#s scaffolding model makes your app work on G...s.first_name)+\' \'+str(ans.last_name)\\n   return f\\n", environment={\'A\': <class \'gluon.html.A\'>, \'Auth\': <class \'gluon.tools.Auth\'>, \'B\': <class \'gluon.html.B\'>, \'BEAUTIFY\': <class \'gluon.html.BEAUTIFY\'>, \'BODY\': <class \'gluon.html.BODY\'>, \'BR\': <class \'gluon.html.BR\'>, \'BUTTON\': <class \'gluon.html.BUTTON\'>, \'CAT\': <class \'gluon.html.CAT\'>, \'CENTER\': <class \'gluon.html.CENTER\'>, \'CLEANUP\': <class \'gluon.validators.CLEANUP\'>, ...}, layer=\'/home/www-data/web2py/applications/prototype/models/db.py\')'
+p88
+sS'func'
+p89
+S'restricted'
+p90
+sa(dp91
+g66
+S'/home/www-data/web2py/applications/prototype/models/db.py'
+p92
+sg68
+(dp93
+S'IS_INT_IN_RANGE'
+p94
+S"<class 'gluon.validators.IS_INT_IN_RANGE'>"
+p95
+sS'singular'
+p96
+S'undefined'
+p97
+sS'plural'
+p98
+g97
+sS'IS_EMPTY_OR'
+p99
+S"<class 'gluon.validators.IS_EMPTY_OR'>"
+p100
+sS'Field'
+p101
+S"<class 'gluon.dal.Field'>"
+p102
+sS'requires'
+p103
+g97
+ssg74
+I302
+sg75
+(dp104
+I297
+S"\t\tField('storage_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),"
+p105
+sI298
+S"\t\tField('storage_temparature','double',requires=IS_EMPTY_OR(IS_FLOAT_IN_RANGE(-400,400,error_message='from -400 to +400 in celsius')),label='Storage Temparature (in Celsius)'),"
+p106
+sI299
+S"\t\tField('preparation_protocol','text',length=8000,label='Sample Preparation Protocol Description'),"
+p107
+sI300
+S"                Field('preparation_date','date',requires=IS_EMPTY_OR(IS_DATE_IN_RANGE(format='%d-%m-%Y',maximum=datetime.date.today()))),"
+p108
+sI301
+S"\t\tField('storage_condition','text',length=1000),"
+p109
+sI302
+S"\t\tField('sample_extraction_times','integer',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),singular='Extr Preparation',plural='Extr Preparation')"
+p110
+sI303
+S''
+sI304
+S''
+sI305
+S''
+sI306
+S'#3.1.1 GC'
+p111
+ssg87
+S'()'
+p112
+sg89
+S'<module>'
+p113
+sa(dp114
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p115
+sg68
+(dp116
+S'fields'
+p117
+S'(<gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, ...)'
+p118
+sS'self'
+p119
+S'<DAL uri="sqlite://storage.sqlite">'
+p120
+sS'args'
+p121
+S"{'plural': 'Extr Preparation', 'singular': 'Extr Preparation'}"
+p122
+sS'tablename'
+p123
+S"'extraction_preparation'"
+p124
+sS'table'
+p125
+g97
+sS'self.lazy_define_table'
+p126
+S'<bound method DAL.lazy_define_table of <DAL uri="sqlite://storage.sqlite">>'
+p127
+ssg74
+I7651
+sg75
+(dp128
+I7648
+S'            self._LAZY_TABLES[tablename] = (tablename,fields,args)'
+p129
+sI7649
+S'            table = None'
+p130
+sI7650
+S'        else:'
+p131
+sI7651
+S'            table = self.lazy_define_table(tablename,*fields,**args)'
+p132
+sI7652
+S'        if not tablename in self.tables:'
+p133
+sI7653
+S'            self.tables.append(tablename)'
+p134
+sI7654
+S'        return table'
+p135
+sI7655
+S''
+sI7646
+S'                    % (tablename,invalid_args))'
+p136
+sI7647
+S'        if self._lazy_tables and not tablename in self._LAZY_TABLES:'
+p137
+ssg87
+S'(self=<DAL uri="sqlite://storage.sqlite">, tablename=\'extraction_preparation\', *fields=(<gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, ...), **args={\'plural\': \'Extr Preparation\', \'singular\': \'Extr Preparation\'})'
+p138
+sg89
+S'define_table'
+p139
+sa(dp140
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p141
+sg68
+(dp142
+S'polymodel'
+p143
+S'None'
+p144
+ssg74
+I7688
+sg75
+(dp145
+I7683
+S'            try:'
+p146
+sI7684
+S'                GLOBAL_LOCKER.acquire()'
+p147
+sI7685
+S'                self._lastsql = self._adapter.create_table('
+p148
+sI7686
+S'                    table,migrate=migrate,'
+p149
+sI7687
+S'                    fake_migrate=fake_migrate,'
+p150
+sI7688
+S'                    polymodel=polymodel)'
+p151
+sI7689
+S'            finally:'
+p152
+sI7690
+S'                GLOBAL_LOCKER.release()'
+p153
+sI7691
+S'        else:'
+p154
+sI7692
+S'            table._dbt = None'
+p155
+ssg87
+S'(self=<DAL uri="sqlite://storage.sqlite">, tablename=\'extraction_preparation\', *fields=(<gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, <gluon.dal.Field object>, ...), **args={\'plural\': \'Extr Preparation\', \'singular\': \'Extr Preparation\'})'
+p156
+sg89
+S'lazy_define_table'
+p157
+sa(dp158
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p159
+sg68
+(dp160
+S'fake_migrate'
+p161
+S'False'
+p162
+ssg74
+I990
+sg75
+(dp163
+I992
+S'        return query'
+p164
+sI993
+S''
+sI994
+S'    def migrate_table('
+p165
+sI985
+S'            self.file_close(tfile)'
+p166
+sI986
+S'            if sql_fields != sql_fields_old:'
+p167
+sI987
+S'                self.migrate_table(table,'
+p168
+sI988
+S'                                   sql_fields, sql_fields_old,'
+p169
+sI989
+S'                                   sql_fields_aux, logfile,'
+p170
+sI990
+S'                                   fake_migrate=fake_migrate)'
+p171
+sI991
+S'        self.file_close(logfile)'
+p172
+ssg87
+S'(self=<gluon.dal.SQLiteAdapter object>, table=<Table extraction_preparation (id,sample_name,sa..._date,storage_condition,sample_extraction_times)>, migrate=True, fake_migrate=False, polymodel=None)'
+p173
+sg89
+S'create_table'
+p174
+sa(dp175
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p176
+sg68
+(dp177
+S'self'
+p178
+S'<gluon.dal.SQLiteAdapter object>'
+p179
+sS'self.execute'
+p180
+S'<bound method SQLiteAdapter.execute of <gluon.dal.SQLiteAdapter object>>'
+p181
+sS'sub_query'
+p182
+S"'ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;'"
+p183
+ssg74
+I1093
+sg75
+(dp184
+I1088
+S'                              % datetime.datetime.today().isoformat())'
+p185
+sI1089
+S"                db['_lastsql'] = '\\n'.join(query)"
+p186
+sI1090
+S'                for sub_query in query:'
+p187
+sI1091
+S"                    logfile.write(sub_query + '\\n')"
+p188
+sI1092
+S'                    if not fake_migrate:'
+p189
+sI1093
+S'                        self.execute(sub_query)'
+p190
+sI1094
+S'                        # Caveat: mysql, oracle and firebird do not allow multiple alter table'
+p191
+sI1095
+S'                        # in one transaction so we must commit partial transactions and'
+p192
+sI1096
+S'                        # update table._dbt after alter table.'
+p193
+sI1097
+S'                        if db._adapter.commit_on_alter_table:'
+p194
+ssg87
+S"(self=<gluon.dal.SQLiteAdapter object>, table=<Table extraction_preparation (id,sample_name,sa..._date,storage_condition,sample_extraction_times)>, sql_fields={'amount_of_sample_taken': {'length': 512, 'notnull': False, 'sortable': 6, 'sql': 'CHAR(512)', 'type': 'string', 'unique': False}, 'extract_cleanup': {'length': 5000, 'notnull': False, 'sortable': 13, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_protocol': {'length': 32768, 'notnull': False, 'sortable': 9, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_protocol_name': {'length': 32768, 'notnull': False, 'sortable': 10, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_solvent': {'length': 1000, 'notnull': False, 'sortable': 8, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_volume': {'length': 512, 'notnull': False, 'sortable': 11, 'sql': 'DOUBLE', 'type': 'double', 'unique': False}, 'harvest_stage': {'length': 512, 'notnull': False, 'sortable': 4, 'sql': 'CHAR(512)', 'type': 'string', 'unique': False}, 'id': {'length': 512, 'notnull': False, 'sortable': 1, 'sql': 'INTEGER PRIMARY KEY AUTOINCREMENT', 'type': 'id', 'unique': False}, 'plant_type': {'length': 512, 'notnull': False, 'sortable': 14, 'sql': 'CHAR(512)', 'type': 'string', 'unique': False}, 'preparation_date': {'length': 512, 'notnull': False, 'sortable': 21, 'sql': 'DATE', 'type': 'date', 'unique': False}, ...}, sql_fields_old={'amount_of_sample_taken': {'length': 512, 'notnull': False, 'sortable': 6, 'sql': 'CHAR(512)', 'type': 'string', 'unique': False}, 'extract_cleanup': {'length': 5000, 'notnull': False, 'sortable': 13, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_protocol': {'length': 32768, 'notnull': False, 'sortable': 9, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_protocol_name': {'length': 32768, 'notnull': False, 'sortable': 10, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_solvent': {'length': 1000, 'notnull': False, 'sortable': 8, 'sql': 'TEXT', 'type': 'text', 'unique': False}, 'extraction_volume': {'length': 512, 'notnull': False, 'sortable': 11, 'sql': 'DOUBLE', 'type': 'double', 'unique': False}, 'harvest_stage': {'length': 512, 'notnull': False, 'sortable': 5, 'sql': 'CHAR(512)', 'type': 'string', 'unique': False}, 'id': {'length': 512, 'notnull': False, 'sortable': 1, 'sql': 'INTEGER PRIMARY KEY AUTOINCREMENT', 'type': 'id', 'unique': False}, 'preparation_date': {'length': 512, 'notnull': False, 'sortable': 19, 'sql': 'DATE', 'type': 'date', 'unique': False}, 'preparation_protocol': {'length': 8000, 'notnull': False, 'sortable': 18, 'sql': 'TEXT', 'type': 'text', 'unique': False}, ...}, sql_fields_aux={'amount_of_sample_taken': {'sql': 'CHAR(512)'}, 'extract_cleanup': {'sql': 'TEXT'}, 'extraction_protocol': {'sql': 'TEXT'}, 'extraction_protocol_name': {'sql': 'TEXT'}, 'extraction_solvent': {'sql': 'TEXT'}, 'extraction_volume': {'sql': 'DOUBLE'}, 'harvest_stage': {'sql': 'CHAR(512)'}, 'id': {'sql': 'INTEGER PRIMARY KEY AUTOINCREMENT'}, 'plant_type': {'sql': 'CHAR(512)'}, 'preparation_date': {'sql': 'DATE'}, ...}, logfile=<gluon.portalocker.LockedFile object>, fake_migrate=False)"
+p195
+sg89
+S'migrate_table'
+p196
+sa(dp197
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p198
+sg68
+(dp199
+S'a'
+S"('ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;',)"
+p200
+sS'self'
+p201
+S'<gluon.dal.SQLiteAdapter object>'
+p202
+sS'b'
+g21
+sS'self.log_execute'
+p203
+S'<bound method SQLiteAdapter.log_execute of <gluon.dal.SQLiteAdapter object>>'
+p204
+ssg74
+I1758
+sg75
+(dp205
+I1760
+S'    def represent(self, obj, fieldtype):'
+p206
+sI1761
+S'        field_is_type = fieldtype.startswith'
+p207
+sI1762
+S'        if isinstance(obj, CALLABLETYPES):'
+p208
+sI1753
+S'        self.db._timings.append((command,time.time()-t0))'
+p209
+sI1754
+S'        del self.db._timings[:-TIMINGSSIZE]'
+p210
+sI1755
+S'        return ret'
+p211
+sI1756
+S''
+sI1757
+S'    def execute(self, *a, **b):'
+p212
+sI1758
+S'        return self.log_execute(*a, **b)'
+p213
+sI1759
+S''
+ssg87
+S"(self=<gluon.dal.SQLiteAdapter object>, *a=('ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;',), **b={})"
+p214
+sg89
+S'execute'
+p215
+sa(dp216
+g66
+S'/home/www-data/web2py/gluon/dal.py'
+p217
+sg68
+(dp218
+S'a'
+S"('ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;',)"
+p219
+sS'b'
+g21
+sS'self'
+p220
+S'<gluon.dal.SQLiteAdapter object>'
+p221
+sS'ret'
+p222
+g97
+sS'self.cursor'
+p223
+S'<sqlite3.Cursor object>'
+p224
+sS'self.cursor.execute'
+p225
+S'<built-in method execute of sqlite3.Cursor object>'
+p226
+ssg74
+I1752
+sg75
+(dp227
+I1747
+S'        command = a[0]'
+p228
+sI1748
+S'        if self.db._debug:'
+p229
+sI1749
+S"            LOGGER.debug('SQL: %s' % command)"
+p230
+sI1750
+S'        self.db._lastsql = command'
+p231
+sI1751
+S'        t0 = time.time()'
+p232
+sI1752
+S'        ret = self.cursor.execute(*a, **b)'
+p233
+sI1753
+S'        self.db._timings.append((command,time.time()-t0))'
+p234
+sI1754
+S'        del self.db._timings[:-TIMINGSSIZE]'
+p235
+sI1755
+S'        return ret'
+p236
+sI1756
+S''
+ssg87
+S"(self=<gluon.dal.SQLiteAdapter object>, *a=('ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;',), **b={})"
+p237
+sg89
+S'log_execute'
+p238
+sasS'pyver'
+p239
+S'Python 2.7.3: /usr/bin/python (prefix: /usr)'
+p240
+sS'session'
+p241
+g61
+(S's\x1a\x00\x00\x00<div><table></table></div>'
+tRp242
+sS'etype'
+p243
+S"<class 'sqlite3.OperationalError'>"
+p244
+sS'date'
+p245
+S'Tue Mar 12 12:42:25 2013'
+p246
+sS'response'
+p247
+g61
+(S'sL\x10\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top">body</td><td valign="top">:</td><td><div>&lt;cStringIO.StringO object at 0x7f703c508458&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">cookies</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">session_id_prototype</td><td valign="top">:</td><td><div>127.0.0.1-6763bf2d-31cf-4606-bbea-5e6c57542c13<table><tr><td style="font-weight:bold;vertical-align:top">comment</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">domain</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">expires</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">httponly</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">max-age</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">path</td><td valign="top">:</td><td><div>/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">secure</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">version</td><td valign="top">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">delimiters</td><td valign="top">:</td><td><div><table><tr><td><div>{{</div></td></tr><tr><td><div>}}</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">files</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">flash</td><td valign="top">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">generic_patterns</td><td valign="top">:</td><td><div><table><tr><td><div>*</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">headers</td><td valign="top">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top">X-Powered-By</td><td valign="top">:</td><td><div>web2py</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">menu</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">meta</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">models_to_run</td><td valign="top">:</td><td><div><table><tr><td><div>^\\w+\\.py$</div></td></tr><tr><td><div>^default/\\w+\\.py$</div></td></tr><tr><td><div>^default/index/\\w+\\.py$</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">postprocessing</td><td valign="top">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_cookie_expires</td><td valign="top">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_data_name</td><td valign="top">:</td><td><div>session_data_prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_filename</td><td valign="top">:</td><td><div>/home/www-data/web2py/applications/prototype/sessions/127.0.0.1-6763bf2d-31cf-4606-bbea-5e6c57542c13</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id</td><td valign="top">:</td><td><div>127.0.0.1-6763bf2d-31cf-4606-bbea-5e6c57542c13</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_id_name</td><td valign="top">:</td><td><div>session_id_prototype</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_new</td><td valign="top">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">session_storage_type</td><td valign="top">:</td><td><div>file</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">status</td><td valign="top">:</td><td><div>200</div></td></tr><tr><td style="font-weight:bold;vertical-align:top">view</td><td valign="top">:</td><td><div>default/index.html</div></td></tr></table></div>'
+tRp248
+sS'locals'
+p249
+(dp250
+S'a'
+S"('ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;',)"
+p251
+sS'self'
+p252
+S'<gluon.dal.SQLiteAdapter object>'
+p253
+sS'b'
+g21
+sS'command'
+p254
+S"'ALTER TABLE extraction_preparation ADD source_of_germplasm CHAR(512) NOT NULL;'"
+p255
+sS't0'
+p256
+S'1363072345.848623'
+p257
+sssS'traceback'
+p258
+S'Traceback (most recent call last):\n  File "/home/www-data/web2py/gluon/restricted.py", line 212, in restricted\n    exec ccode in environment\n  File "/home/www-data/web2py/applications/prototype/models/db.py", line 302, in <module>\n    Field(\'sample_extraction_times\',\'integer\',requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0,6))),singular=\'Extr Preparation\',plural=\'Extr Preparation\')\n  File "/home/www-data/web2py/gluon/dal.py", line 7651, in define_table\n    table = self.lazy_define_table(tablename,*fields,**args)\n  File "/home/www-data/web2py/gluon/dal.py", line 7688, in lazy_define_table\n    polymodel=polymodel)\n  File "/home/www-data/web2py/gluon/dal.py", line 990, in create_table\n    fake_migrate=fake_migrate)\n  File "/home/www-data/web2py/gluon/dal.py", line 1093, in migrate_table\n    self.execute(sub_query)\n  File "/home/www-data/web2py/gluon/dal.py", line 1758, in execute\n    return self.log_execute(*a, **b)\n  File "/home/www-data/web2py/gluon/dal.py", line 1752, in log_execute\n    ret = self.cursor.execute(*a, **b)\nOperationalError: Cannot add a NOT NULL column with default value NULL\n'
+p259
+s.

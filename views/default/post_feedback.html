@@ -1,0 +1,28 @@
+<style>
+.text {
+ width:400px;
+ height:100px;
+}
+</style>
+<script>
+jQuery(document).ready(function(){
+		   jQuery('#feedback_form').hide();
+		   jQuery('#feedback_button').click(function(){ jQuery('#feedback_form').slideToggle();});
+});
+</script>
+<div class="feedback">
+<button id="feedback_button">Feedback</button>
+<div id="feedback_form">
+{{if past_feeds:}}
+<b>Current Feedback </b>
+<ol>
+{{for feed in past_feeds:}}
+<li>{{=feed.feedback_body}}</li>
+<hr />
+{{pass}}
+</ol>
+{{pass}}
+{{=form}}
+</div>
+</div>
+

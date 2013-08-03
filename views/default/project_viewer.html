@@ -1,0 +1,192 @@
+{{extend 'layout.html'}}
+<style>
+ .big-heading {
+ font-size:27px;
+ font-weight:bold;
+}
+</style>
+<center><span> <span class="label label-info">project</span><span class="big-heading"> {{=project.name}} </span></span></center>
+{{sum=dict()}}
+{{for i in project_summary:}}
+  {{if i.role in sum:}}
+     {{sum[i.role]=sum[i.role]+1}}
+  {{else:}}
+     {{sum[i.role]=1}}
+  {{pass}}
+{{pass}}
+<center><span class='label label-info'></span>{{for i in sum:}}{{=(i+"   "+str(sum[i])+",    ")}}{{pass}}
+</br>
+<table class="table table-hover table-striped"><tr id="pen{{=project.id}}">
+
+<!--td>
+<button onclick="ajax('{{=URL('ajx_publish',args=('publish',project.id))}}',[],null);jQuery('tr#pen{{=project.id}}').slideUp()">Publish</button>
+</td-->
+<div align="right">
+{{if is_coordinator:}}
+{{if  project.project_status == "0":}}
+<div align='right'>
+<INPUT type="button" class="btn btn-success" value="Publish"
+onclick="location.href='{{=URL('ajx_publish',args=('publish',project.id))}}'"/>
+</FORM>
+</div>
+{{pass}}
+{{if project.project_status == "1":}}
+<div align='right'>
+<INPUT type="button" class="btn btn-success" value="Un Publish"
+onclick="location.href='{{=URL('ajx_publish',args=('unpublish',project.id))}}'"/>
+</FORM>
+</div>
+{{pass}}
+{{pass}}
+</div>
+<!--table>
+<td>
+{{if project.project_status == '0':}}
+</td>
+<td>
+{{=H5(A('SignUp for Project',_href=URL('reg_project',args=project.id)))}}
+</td>
+<td>
+{{if project.project_coordinator == auth.user.id: }}
+{{=H5(A('Role management',_href=URL('roles',args=project.id)))}}
+{{pass}}
+</td>
+<td>
+{{=H5(A('Add new Sample',_href=URL('add_sample',args=project.id)))}}
+</td>
+<td>
+{{=H5(A('My Samples',_href=URL('my_samples',args=(project.id))))}}
+</td>
+<td>
+{{pass}}
+{{if project.project_status == '1':}}
+{{=H5(A('Published Samples',_href=URL('list_all_pub_samples',args=(project.id))))}}
+{{pass}}
+</td>
+</table-->
+<style>
+ .heading {
+  font-weight:bold;
+  line-spacing:-1px;
+  font-size:20px;
+
+ }
+</style>
+<body>
+<br>
+<br>
+<span class="heading">Project Details  </span><button type="button" class="btn btn-primary"> <i class="icon-chevron-down icon-white"></i></button></span>
+<table  class="table table-hover table-striped" id="details">
+<tr><td><b>Project code</b></td><td>{{=project.code}}</td></tr>
+<tr><td><b>Project Start Date</b></td>  <td>{{=project.start_date}}</td></tr>
+<tr><td><b>Institute/Lab</b></td>  <td>{{=cord.affiliated_to}}</td></tr>
+<tr><td><b>Project Description</b> </td>  <td>{{=project.project_description}}</td></tr>
+{{if project.project_literature_reference : }}
+<tr><td><b>Project References</b> </td>  <td>{{=H5(A(project.project_literature_reference,_href='http://www.ncbi.nlm.nih.gov/pubmed/'+str(project.project_literature_reference)))}}</td></tr>
+{{pass}}
+<tr><td><b>Already Published Work</td></b>  <td>{{=project.project_journal_name}}</td></tr>
+{{if project.project_publication_date:}}
+{{delta = project.project_publication_date - project.start_date}}
+<tr><td><b>Project Duration</td></b>  <td>{{= str(delta.days)+' days'}}</td></tr>
+{{else:}}
+<tr><td><b>Project Duration</td></b>  <td>{{= 'Not yet published' }}</td></tr>
+{{pass}}
+</table>
+
+
+
+<br>
+<br>
+<span class="heading">People Involved in project  </span><button type="button" class="btn btn-primary"> <i class="icon-chevron-down icon-white"></i></button></span>
+</br>
+<table class="table table-hover table-striped">
+<tr>
+<td><b>Project Co-Ordinator </b></td>
+<td>{{=A(cord.first_name+' '+cord.last_name,_href=URL('user_viewer',args=cord.id))}}</td>
+</tr>
+<tr>
+
+<td><b>Investigators</b></td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='0':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+<tr>
+<td>
+<b>{{="Co-Investigators"}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='1':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+
+<tr>
+<td>
+<b>{{="Collaborators "}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='2':}}
+{{=A(user.auth_user.first_name,_href=URL('user_viewer',args=user.auth_user.id))}},
+{{pass}}
+{{pass}}
+</td>
+</tr>
+
+
+
+<!--tr>
+<td>
+{{#="Analysts :-"}}
+</td>
+<td>
+{{#for user in users:}}
+{{#if user.role.role=='3':}}
+{{#=user.auth_user.first_name}}
+{{#pass}}
+{{#pass}}
+</td>
+</tr-->
+
+
+
+
+<tr>
+<td>
+<b>{{="Experimentalists"}}</b>
+</td>
+<td>
+{{for user in users:}}
+{{if user.role.role=='4':}}
+{{local=dict()}}
+{{local[0]=0}}
+{{local[1]=0}}
+{{for l in samples:}}
+{{if user.role.user==l.role.user:}}
+    {{if l.sample.working_status=='1':}}
+      {{local[0]=local[0]+1}}
+    {{else:}}
+      {{local[1]=local[1]+1}}
+    {{pass}}
+{{pass}}
+{{pass}}
+{{=A(user.auth_user.first_name+" "+user.auth_user.last_name,_href=URL('user_viewer',args=user.auth_user.id))+"(p s-"+str(local[1])+",     un p s-"+str(local[0])+")    "}},
+{{pass}}
+     
+{{pass}}
+</td>
+</tr>
+</table>
+</br>

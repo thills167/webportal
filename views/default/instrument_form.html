@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+
+{{for methodforms in forms:}}
+	<h3>Method: {{=methodnames[0]}}</h3>
+	{{for form in methodforms:}}
+		{{=form}}
+	{{pass}}
+{{pass}}

@@ -1,0 +1,12 @@
+{{extend 'layout.html'}}
+<style>
+#sample_scientific_name {
+	font-style:italic;
+}
+</style>
+{{if not error:}}
+{{=form}}
+{{else:}}
+{{=error}}
+{{pass}}
+{{pass}}

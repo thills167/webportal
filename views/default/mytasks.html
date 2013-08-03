@@ -1,0 +1,45 @@
+{{extend 'layout.html'}}
+
+Tasks that are currently in queue
+
+<div class="queued">
+<table class="table">
+<tr>
+		<th>Task ID </th>
+		<th>Status </th>
+		<th>Start Time </th>
+		<th>End Time </th>
+</tr>
+{{ for task in queued: }}
+<tr>
+<td>{{=A(task.id,_href=URL('task_viewer',args=task.id))}}</td>
+<td>{{=SPAN(status_list[int(task.status)],_class='label label-info')}}</td>
+<td>{{=task.start_time}}</td>
+<td>{{=task.end_time}}</td>
+</tr>
+{{pass}}
+</table>
+</div>
+
+Your History
+
+<div class="history">
+<table class="table">
+<tr>
+		<th>Task ID </th>
+		<th>Status </th>
+		<th>Start Time </th>
+		<th>End Time </th>
+</tr>
+<tr>
+{{for task in other:}}
+<td>{{=A(task.id,_href=URL('task_viewer',args=task.id))}}</td>
+<td>{{=SPAN(status_list[int(task.status)],_class='label label-info')}}</td>
+<td>{{=task.start_time}}</td>
+<td>{{=task.end_time}}</td>
+</tr>
+{{pass}}
+</table>
+
+</div>
+

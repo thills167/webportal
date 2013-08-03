@@ -1,0 +1,36 @@
+auth_user.id,auth_user.first_name,auth_user.last_name,auth_user.email,auth_user.password,auth_user.registration_key,auth_user.reset_password_key,auth_user.registration_id,auth_user.title,auth_user.position,auth_user.affiliated_to,auth_user.address,auth_user.city,auth_user.country,auth_user.postal_code,auth_user.phone,auth_user.mobile,auth_user.registration_at
+1,Vikram,Pudi,vikram@iiit.ac.in,d03de018a63f2d3c366b5dcbf9ee4b65,,,,3,1,IIIT Hyderabad,Gachibowli,Hyderabad,India,500032,9849059842,9849059842,0
+2,Anil,Nalamalapu,anil.iiith@gmail.com,970c570d61e9e09f208bf2aa3f8d25cc,,1347447558-87819f8e-bb24-4b00-b486-30e99a0b15ee,,0,2,IIIT Hyderabad,Gachibowli,Hyderabad,India,500032,99999999,99999999,0
+3,Geeta,Yeleswarapu,geetayele@yahoo.co.in,218f6cc3929248051c74921b2bdd2686,,1347440147-1f1460e9-6b4d-4630-8558-ae56c6c83ca0,,4,1,IIIT Hyderabad,"Gachibowli,",hyderabad,India,500032,"40-23001967,+91-40-23001969",9652553334,0
+4,Lekha,Padmaram,lekha.padmaram@gmail.com,9fc834e5ff2ace3d42f353291fdb3243,,,,4,1,iiiit h,sdfg,sdfg,India,sdf,dsf,sdf,0
+5,Narendra,Babu,babu.dfrc@gmail.com,f58dc7610d68bfc85496bbb5ba8715e0,,,,4,0,RA,CCNSB,Hyderabad,India,500032,8179834959,8179834959,0
+6,PRIYA RANJAN,KUMAR,priyaranjan.kumar@students.iiit.ac.in,0835d7189a6927648202bd9d8a8562a8,,,,0,2,IIIT-H,IIIT-H,Hyderabad,India,500032,8885425628,8885425628,0
+7,Abhijit,Mitra,abi_chem@iiit.ac.in,3a0186f99780a05235753fbda2424614,,,,3,1,IIIT Hyderabad,Gachibowli,Hyderabad,India,500032,+914066531201,+919866406028,0
+8,veena,shinde,veena.shinde@research.iiit.ac.in,51da3cfe2d76191a0046a38565e4701c,,,,2,2,IIIT-H,"IIIT,Hyderabad.",Hyderabad,India,500032,9491877528,9491877528,0
+9,indira,ghosh,ighdna@yahoo.com,adc035cd1bf2ad39d938d9679a4396ae,,,,3,1,"SCIS, JNU","SCIS , JNU, New Mehrauli Road, New Delhi 11 0067",Delhi,India,110067,11 26738707,9971287771,1
+10,Prashanthi,D,prashanthi.d@research.iiit.ac.in,3a6bf154d1fd23dc7f64869a5c2fec5b,,,,2,2,IIIT H,IIIT Hyderabad,Hyderabad,India,500032,9491546962,9491546962,0
+11,ABCD,efgh,y_geeta64@yahoo.com,517b206e55debae20e2761fdc42a0611,1caec018-f6d4-4a73-9eba-3c68f9e56a14,,,3,1,ghjk,vjhgs,Hyderabad,India,500016,04044563456,9876453234,0
+12,Anil,Nalamalapu,anil1in7@gmail.com,079bbcab15414886a685329aabe5aa9f,7921a732-6ee6-4538-bf25-97a05a3f2e9e,,,0,2,IIIT-H,NA,Hyderabad,India,500032,NA,NA,0
+13,asdfh,ksaldfj,abc@g.com,079bbcab15414886a685329aabe5aa9f,fe5bdad7-b119-4421-b20b-50d5efe39ae0,,,0,2,fsad,fds,fsd,India,fsd,,fsd,0
+14,a,sa,abcf@g.com,079bbcab15414886a685329aabe5aa9f,cdbfc9ce-1982-41ed-a98e-5662a888ef2d,,,0,2,sadf,sdf,sdf,India,fsd,sdfa,sdaf,0
+15,test,test,mytestmail141@gmail.com,3209dfeb866e06638d334e68055d777c,,,,0,2,IIIT,IIIT,hyderabd,India,500032,9848022338,9848032919,0
+16,PRIYA RANJAN,KUMAR,priyaranjan.biet07@gmail.com,0835d7189a6927648202bd9d8a8562a8,,,,0,2,IIIT-H,iiith,Hyderabad,India,500032,8885425628,8885425628,0
+17,PARANIDHARAN,VAIKUNTAVASAN,agriparani@yahoo.com,561ee1d1b2ba9a4d7e2ba1656808a722,4681e139-0495-444b-a300-c4e35fa0ea91,,,4,1,Tamil Nadu Agricultural University,"Associate Professor
+Department of Plant Pathology
+Tamil Nadu Agricultural University
+Coimbatore-641003",Coimbatore,India,641003,0422-6611226,9486587939,1
+18,renu,pandey,renu_iari@rediffmail.com,91bfb37f619a891dd3f334dd59a51416,b28983b0-4c6b-4fb8-ac7c-d86d814e2c3f,,,4,1,Indian Agricultural Research Institute,"Mineral Nutrition Laboratory, Division of Plant Physiology, Indian Agricultural Research Institute,",New Delhi,India,110012,,9711375510,1
+19,Sarada,Tetali,saradakanakagiri@gmail.com,817d0ccda47b2923ba40c33a59ced307,ba7da24a-52f8-4fb1-852e-ab59da156e24,,,4,1,University of Hyderabad,"Department of Plant Sciences
+University of Hyderabad
+Gachibowli",Hyderabad,India,500046,91 40 2313 4512,9246527805,0
+20,Prateek,Gupta,prateekg04@gmail.com,086f8e92e9c5017a6046e24833292489,c19bd3f0-16df-43b5-b1eb-5337d3bc9fd9,,,0,2,University of Hyderabad,"C/o Prof.R.P.Sharma, Dept. of Plant Science,
+University of Hyderabad",Hyderabad,India,500046,917382460534,917382460534,0
+21,Rameshwar,Sharma,rameshwar.sharma@gmail.com,4c5a22e95da0a491be2b5fd001758ede,b6c5c30f-ab3a-4a67-9af0-16263a472bd1,,,3,1,University of Hyderabad,"Dept of Plant Sciences
+University of Hyderabad
+Hyderabad",Hyderabad,India,500046,23134552,9441490428,0
+22,KILAMBI,HIMABINDU VASUKI,h.vasuki@gmail.com,be4c23397809dc111069f4339fa0db25,f827f5f7-13c1-403b-ad27-81a46183c528,,,2,2,Dr.Y.sreelakshmi,"K HIMABINDU VASUKI, C/O DR Y SREELAKSHMI, DEPT. OF PLANT SCIENCES, SCHOOL OF LIFE SCIENCES, UNIVERSITY OF HYDERABAD, HYDERABAD.",HYDERABAD,India,500046,,9989799615,0
+23,kamal,tyagi,tyagi.kamal6672@gmail.com,3183098eca49125116164225ea5a4c8c,1f3265bc-ebdf-4e78-ab0d-e509793df928,,,0,2,University of Hyderabad,"c/o Prof. R P Sharma, Dept. of Plant Sciences,
+School of Life Sciences, University of Hyderabad,
+Gachibowli",Hyderabad,India,500046,,8106370158,0
+24,sreelakshmi,Yellamaraju,syellamaraju@gmail.com,c00a0d727792c6794339fb70d1112457,eb18612e-6530-4463-b5d7-f0028c9ff0fc,,,4,1,University of Hyderabad,"Dept of Plant Sciences, School of Life Sciences,
+University of Hyderabad, Gachibowli, Hyderabad-500046",Hyderabad,India,500046,23134510,-,0

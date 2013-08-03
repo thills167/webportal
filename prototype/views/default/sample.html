@@ -1,0 +1,144 @@
+{{extend 'layout_boot.html'}}
+<script>
+  $(document).ready(function() {
+		  $('#secret').click( function() {
+			 $('.collapse').collapse('toggle'); });
+
+});
+</script>
+<h4><abbr title="Sample Name">{{=sample.name}}</abbr>  <small>created by {{=A(user.first_name+' ' +user.last_name,_href=URL('user_viewer',args=sample.experimentalist))}}</small>
+<span class="label label-info">{{='Published' if sample.publication_status == 1 else 'Not Published'}}</span>
+<span class="label label-success">{{='In Progress' if sample.working_status == 1 else 'Completed'}}</span>
+<span class="label label-warning">Alicot</span>
+</small></h4>
+
+<dl class="dl-horizontal">
+<dt>Sample Code</dt>
+<dd>{{=sample.code}}</dd>
+<dt>Description</dt>
+<dd>{{=sample.description}}</dd>
+<dt>Experiment</dt>
+<dd>{{=experiment.name}}<dd>
+</dl>
+<span class="pull-right">
+<i class="icon-wrench"></i>
+<button type="button" class="btn btn-primary label" id="secret">collapse/toggle all </button>
+</span>
+<span>
+<button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#biosource"> Bio-Source </button>
+<small class="muted"> {{=len(biosource)}} record(s) found </small>
+</span>
+
+<div id="biosource" class="collapse in">
+{{for each in biosource_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+<span>
+<button type="button" class="btn btn-success" data-toggle="collapse" data-target="#pgcondition"> Plant Growth Condition</button>
+<small class="muted"> {{=len(plant_growth)}} record(s) found </small>
+</span>
+
+<div id="pgcondition" class="collapse in">
+{{for each in pgc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-warning" data-toggle="collapse" data-target="#treatment"> Treatment </button>
+<small class="muted"> {{=len(treatment)}} record(s) found </small>
+</span>
+
+<div id="treatment" class="collapse in">
+{{for each in treatment_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-danger" data-toggle="collapse" data-target="#harvest"> Harvest </button>
+<small class="muted"> {{=len(harvest)}} record(s) found </small>
+</span>
+
+<div id="harvest" class="collapse in">
+{{for each in harvest_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+<span>
+<button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#gc"> Gas Chromatography </button>
+<small class="muted"> {{=len(gc)}} record(s) found </small>
+</span>
+
+<div id="gc" class="collapse in">
+{{for each in gc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+
+<span>
+<button type="button" class="btn btn-success" data-toggle="collapse" data-target="#lc"> Liquid Chromatography </button>
+<small class="muted"> {{=len(lc)}} record(s) found </small>
+</span>
+
+<div id="lc" class="collapse in">
+{{for each in lc_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+
+<span>
+<button type="button" class="btn btn-warning" data-toggle="collapse" data-target="#ms"> Mass Spectroscopy </button>
+<small class="muted"> {{=len(ms)}} record(s) found </small>
+</span>
+
+<div id="ms" class="collapse in">
+{{for each in ms_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>
+
+
+<span>
+<button type="button" class="btn btn-inverse" data-toggle="collapse" data-target="#raw"> Raw Data Storage Information </button>
+<small class="muted"> {{=len(raw_storage)}} record(s) found </small>
+</span>
+
+<div id="raw" class="collapse in">
+{{for each in raw_forms:}}
+<ol>
+<li>{{=each}}</li>
+<ol>
+{{pass}}
+</div>

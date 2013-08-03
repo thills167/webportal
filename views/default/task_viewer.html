@@ -1,0 +1,99 @@
+{{extend 'layout.html'}}
+
+Task ID {{=task.id}}
+
+
+<table class="table">
+<tr>
+	<td> Task ID </td>
+	<td> {{=task.id}} </td>
+</tr>
+<tr>
+	<td> Task Status </td>
+	<td> <span class="label label-info">{{=status_list[int(task.status)]}} </span>
+        {{filename = str(task.id)+'.jpg'}}
+    {{=A(task.id,_href=URL('download',args=filename))}} </td>
+    
+</tr>
+<tr> 
+	<td> Start Time </td>
+        <td> {{=task.start_time}} </td>
+</tr>
+<tr>
+         <td> End Time </td>
+	 <td> {{=task.end_time}} </td>
+ </tr>
+ <tr>
+	 <td> Peak Detection Method </td>
+	 <td> {{=pdm[int(task.peak_detection_method)]}} </td>
+ </tr>
+
+{{if int(task.peak_detection_method) == 0:}}
+ <tr>  
+	 <td> Ppm</td>
+	 <td> {{=task.ppm}} </td>
+</tr>
+
+
+ <tr>  
+	 <td> Min Peak Width</td>
+	 <td> {{=task.min_peak_width}} </td>
+
+ </tr>
+
+
+ <tr>  
+	 <td> Max Peak Width </td>
+	 <td> {{=task.max_peak_width}} </td>
+ </tr>
+{{pass}}
+
+{{if int(task.peak_detection_method) == 1:}}
+
+ <tr>  
+	 <td> Step Size </td>
+	 <td> {{=task.step_size}}</td>
+ </tr>
+ <tr>  
+	 <td> FWHM</td>
+	 <td>{{=task.fwhm}} </td>
+ </tr>
+ {{pass}}
+
+
+ <tr>
+	 <td>Alignment </td>
+	 <td>{{=alignment_method[int(task.alignment_method)]}}</td>
+ </tr>
+
+{{if int(task.alignment_method) == 0:}}
+<tr>
+	<td>mzWid</td>
+	<td>{{=task.mzwid}}</td>
+</tr>
+
+
+<tr>
+	<td>Min Frac</td>
+	<td>{{=task.minfrac}}</td>
+</tr>
+
+
+<tr>
+	<td>bw</td>
+	<td>{{=task.bw}}</td>
+</tr>
+{{pass}}
+
+<tr>
+	<td>Retention Time Correction</td>
+	<td>{{=ret[int(task.retention_time_method)]}}</td>
+</tr>
+
+{{if int(task.retention_time_method) == 0:}}
+<tr>
+	<td>PeakGroups Method</td>
+	<td>{{='Linear' if task.retention_time_method == 1 else 'LOESS'}}</td>
+</tr>
+{{pass}}
+</table>
